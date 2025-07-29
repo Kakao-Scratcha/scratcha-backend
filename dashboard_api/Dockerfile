@@ -52,14 +52,9 @@ ENV VIRTUAL_ENV=/opt/venv
 COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# FastAPI 애플리케이션 코드 복사
-# 복사된 파일의 소유자를 appuser로, 그룹을 appgroup으로 설정해서 방금 만든 일반 사용자가 코드에 접근하도록 합니다.
-COPY --chown=appuser:appgroup ./app ./app
-
 # Uvicorn 서버가 리스닝할 포트 노출
-
 EXPOSE 8000 
 
 # 컨테이너 시작 시 실행될 기본 명령어
 # docker-compose.yml에서 override 됨
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] 
