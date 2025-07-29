@@ -4,7 +4,7 @@ from passlib.context import CryptContext
 
 from models.user import User
 from repositories.user_repo import UserRepository
-from schemas.user import UserCreate
+from schemas.user import UserCreate, UserUpdate
 
 pwdContext = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -30,3 +30,18 @@ class UserService:
 
     def get_user_by_id(self, userId: str) -> User | None:
         return self.userRepo.get_user_by_id(userId)
+
+    # 사용자 정보 업데이트
+    def update_user(self, userId: str, userUpdate: UserUpdate) -> User | None:
+        """
+        특정 사용자의 프로필 정보를 업데이트합니다.
+        """
+
+        db_user = self.userRepo.get_user_by_id(userId)
+
+        if not db_user:
+            return None  # 사용자를 찾을 수 없음
+
+        updated_user = self.userRepo.update_user(db_user, userUpdate)
+
+        return updated_user
