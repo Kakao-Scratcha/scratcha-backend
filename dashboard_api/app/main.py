@@ -4,8 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
 
 from database import engine, Base
-from routers import users
-from database import SessionLocal, engine
+from routers import users, auth
 
 app = FastAPI(
     title="Dashboard API",
@@ -41,3 +40,4 @@ def read_root():
 
 # 라우터 등록
 app.include_router(users.router, prefix="/api/dashboard")
+app.include_router(auth.router, prefix="/api/dashboard")

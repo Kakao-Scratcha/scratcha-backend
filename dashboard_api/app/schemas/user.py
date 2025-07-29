@@ -18,9 +18,14 @@ class UserResponse(BaseModel):
     email: EmailStr
     userName: str = Field(..., alias="userName")
     createdAt: datetime = Field(..., alias="createdAt")
-    deletedAt: Optional[datetime] = Field(None, alias="deletedAt")
+    # deletedAt: Optional[datetime] = Field(None, alias="deletedAt")
 
     class Config:
         from_attribution = True  # Pydantic v2: orm_mode 대신 from_attributes 사용
         alias_generator = to_camel
         populate_by_name = True
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str

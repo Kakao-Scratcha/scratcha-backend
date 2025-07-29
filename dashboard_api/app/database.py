@@ -22,6 +22,7 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 # 이 클래스의 인스턴스가 실제 데이터베이스 세션이 됩니다.
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# SQLAlchemy 모델의 Base 클래스 (모든 모델이 상속받을 기본)
 Base = declarative_base()
 
 
