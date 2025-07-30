@@ -92,3 +92,17 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
     return user
+
+# 관리자 권한 확인 의존성 함수
+
+
+def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    """
+    현재 인증된 사용자가 'admin' 역할을 가지고 있는지 확인합니다.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다."
+        )
+    return current_user

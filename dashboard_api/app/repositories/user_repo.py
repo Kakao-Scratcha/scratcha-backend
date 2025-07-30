@@ -1,5 +1,6 @@
 # backend/dashboard_api/app/repositories/user_repo.py
 
+from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
@@ -65,3 +66,23 @@ class UserRepository:
         self.db.commit()
         self.db.refresh(dbUser)
         return dbUser
+
+    # 모든 사용자 조회 (관리자용)
+    def get_all_users_admin(self, includeDeleted: bool = False) -> List[User]:
+        """
+        관리자용: 모든 사용자를 조회합니다. includeDeleted가 True이면 소프트 삭제된 사용자도 포함합니다.
+        """
+        query = self.db.query(User)
+        if not includeDeleted:
+            query = query.filter(User.deletedAt.is_(None))
+        return query.all()
+
+    # 특정 ID의 사용자 조회 (삭제된 사용자 포함 가능, 관리자용)
+    def get_user_by_id_admin(self, userId: str, includeDeleted: bool = False) -> User | None:
+        """
+        관리자용: 특정 ID의 사용자를 조회합니다. includeDeleted에 따라 삭제된 사용자도 포함할 수 있습니다.
+        """
+        query = self.db.query(User).filter(User.id == userId)
+        if not includeDeleted:
+            query = query.filter(User.deletedAt.is_(None))
+        return query.first()

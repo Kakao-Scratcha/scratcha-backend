@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     id: str
     email: EmailStr
     userName: str
+    role: str
     createdAt: datetime
     deletedAt: Optional[datetime]  # 소프트 딜리트
 

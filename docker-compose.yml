@@ -13,17 +13,16 @@ services:
     #     ports:
     #         - "8000:8000"
     #     volumes:
-    #         - ./captcha_api/app:/app # <-- 로컬의 ./captcha_api/app을 컨테이너의 /app으로 직접 마운트
+    #         - ./captcha_api/app:/app
     #     depends_on:
     #         db:
     #             condition: service_healthy
-    #     # 컨테이너 내 WORKDIR이 /app이므로, /app/main.py의 'app' 객체를 실행
     #     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
     # 대시보드 API 서비스
     dashboard-api:
         build:
-            context: ./dashboard_api # 로컬의 ./dashboard_api 디렉토리
+            context: ./dashboard_api
             dockerfile: Dockerfile
         container_name: scratcha_dashboard_api
         env_file:
@@ -32,15 +31,10 @@ services:
             - "8001:8001"
         volumes:
             - ./dashboard_api/app:/app
-            - ./alembic.ini:/app/alembic.ini
-            - ./alembic:/app/alembic
         depends_on:
             db:
                 condition: service_healthy
-        # 컨테이너 내 WORKDIR이 /app이므로, /app/main.py의 'app' 객체를 실행
-        command: >
-          sh -c "alembic upgrade head && 
-          uvicorn main:app --host 0.0.0.0 --port 8001 --reload"
+        command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
 
     # MySQL 데이터베이스 서비스
     db:
@@ -76,7 +70,7 @@ services:
             dashboard-api:
                 condition: service_started
         command: >
-          sh -c "sleep 5 && nginx -g 'daemon off;'"
+            sh -c "sleep 5 && nginx -g 'daemon off;'"
 
 # Docker 볼륨 정의
 volumes:
