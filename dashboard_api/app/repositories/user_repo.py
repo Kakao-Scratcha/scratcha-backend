@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from datetime import datetime
 
 from models.user import User
 from schemas.user import UserCreate, UserUpdate
@@ -11,40 +12,56 @@ class UserRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_user_by_email(self, email: str) -> User | None:
-        return self.db.query(User).filter(User.email == email).first()
+    def get_user_by_email(self, email: str, includeDeleted: bool = False) -> User:
+        query = self.db.query(User).filter(User.email == email)
 
-    def get_user_by_id(self, userId: str) -> User | None:
-        return self.db.query(User).filter(User.id == userId).first()
+        # includeDeleted가 False 일때 즉, 이메일이 삭제되지 않았을 때만 필터링
+        if not includeDeleted:
+            query = query.filter(User.deletedAt.is_(None))
 
-    def create_user(self, userData: UserCreate, hashedPassword: str) -> User | None:
+        return query.first()
 
-        db_user = User(
+    def get_user_by_id(self, userId: str) -> User:
+        return self.db.query(User).filter(User.id == userId, User.deletedAt.is_(None)).first()
+
+    # 사용자 생성 CRUD
+    def create_user(self, userData: UserCreate, hashedPassword: str) -> User:
+        """
+        새로운 사용자를 데이터베이스에 추가합니다.
+        """
+        dbUser = User(
             email=userData.email,
             passwordHash=hashedPassword,
             userName=userData.userName,
         )
+        self.db.add(dbUser)
+        self.db.commit()
+        self.db.refresh(dbUser)
+        return dbUser
 
-        try:
-            self.db.add(db_user)
-            self.db.commit()
-            self.db.refresh(db_user)
-            return db_user
-        except IntegrityError:
-            self.db.rollback()
-            return None
+    # 사용자 정보 업데이트 CURD
 
-    # 사용자 정보 업데이트
-    def update_user(self, db_user: User, user_update: UserUpdate) -> User:
+    def update_user(self, dbUser: User, user_update: UserUpdate) -> User:
         """
-        주어진 User 객체의 정보를 UserUpdate 스키마에 따라 업데이트합니다.
+        User 객체의 정보를 UserUpdate 스키마에 따라 업데이트합니다.
         """
         update_data = user_update.model_dump(exclude_unset=True)  # Pydantic v2
 
         for key, value in update_data.items():
-            setattr(db_user, key, value)
+            setattr(dbUser, key, value)
 
-        self.db.add(db_user)  # 변경 감지 및 스테이징
+        self.db.add(dbUser)  # 변경 감지 및 스테이징
         self.db.commit()     # DB에 변경 사항 반영
-        self.db.refresh(db_user)  # 최신 데이터로 객체 새로고침
-        return db_user
+        self.db.refresh(dbUser)  # 최신 데이터로 객체 새로고침
+        return dbUser
+
+    # 사용자 삭제 (soft delete) CRUD
+    def delete_user(self, dbUser: User) -> User:
+        """
+        User 객체를 소프트 삭제합니다.
+        """
+        dbUser.deletedAt = datetime.now()
+        self.db.add(dbUser)
+        self.db.commit()
+        self.db.refresh(dbUser)
+        return dbUser

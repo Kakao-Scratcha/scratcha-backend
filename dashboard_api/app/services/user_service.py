@@ -17,31 +17,49 @@ class UserService:
     def get_password_hash(self, password: str) -> str:
         return pwdContext.hash(password)
 
-    def create_user(self, userData: UserCreate) -> User | None:
-        existingUser = self.userRepo.get_user_by_email(userData.email)
+    def get_user_by_id(self, userId: str) -> User:
+        return self.userRepo.get_user_by_id(userId)
+
+    def create_user(self, userData: UserCreate) -> User:
+        """
+        새로운 사용자를 데이터베이스에 추가합니다.
+        """
+        # 모든 상태의 사용자 (활성 또는 소프트 삭제됨) 중에서 이메일 중복을 확인합니다.
+        existingUser = self.userRepo.get_user_by_email(
+            userData.email, includeDeleted=True)
 
         if existingUser:
-            return None  # 이메일 중복일 시 None 반환
+            # 이메일이 이미 존재하면 (소프트 삭제 상태 포함) None 반환하여 중복 알림
+            return None
 
         hashedPassword = self.get_password_hash(userData.password)
         newUser = self.userRepo.create_user(userData, hashedPassword)
 
         return newUser
 
-    def get_user_by_id(self, userId: str) -> User | None:
-        return self.userRepo.get_user_by_id(userId)
-
-    # 사용자 정보 업데이트
-    def update_user(self, userId: str, userUpdate: UserUpdate) -> User | None:
+    def update_user(self, userId: str, userUpdate: UserUpdate) -> User:
         """
-        특정 사용자의 프로필 정보를 업데이트합니다.
+        사용자의 프로필 정보를 업데이트합니다.
         """
 
-        db_user = self.userRepo.get_user_by_id(userId)
+        dbUser = self.userRepo.get_user_by_id(userId)
 
-        if not db_user:
+        if not dbUser:
             return None  # 사용자를 찾을 수 없음
 
-        updated_user = self.userRepo.update_user(db_user, userUpdate)
+        updatedUser = self.userRepo.update_user(dbUser, userUpdate)
 
-        return updated_user
+        return updatedUser
+
+    def delete_user(self, userId: str) -> User:
+        """
+        User 객체를 소프트 삭제합니다.
+        """
+        dbUser = self.get_user_by_id(userId)
+
+        if not dbUser:
+            return None  # 사용자를 찾을 수 없음 (이미 소프트 삭제됨)
+
+        deletedUser = self.userRepo.delete_user(dbUser)
+
+        return deletedUser
