@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from typing import List
 
-from database import get_db
-from schemas.user import UserCreate, UserResponse, UserUpdate
-from services.user_service import UserService
-from core.security import get_current_user, get_current_admin_user
-from models.user import User
+from dashboard_api.app.routers.deps import get_db
+from dashboard_api.app.schemas.user import UserCreate, UserResponse, UserUpdate
+from dashboard_api.app.services.user_service import UserService
+from dashboard_api.app.core.security import get_current_user, get_current_admin_user
+from dashboard_api.app.models.user import User
 
 router = APIRouter(
     prefix="/users",  # 이 라우터의 모든 경로에 자동으로 /users/ 가 붙음

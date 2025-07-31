@@ -3,7 +3,7 @@
 from sqlalchemy import Column, String, DateTime
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.sql import func
-from database import Base  # Base 임포트
+from db.base import Base  # Base 임포트
 import uuid
 
 

@@ -9,6 +9,9 @@ FROM python:3.10-slim-bullseye AS builder
 # 작업 디렉토리 설정
 WORKDIR /app
 
+# PYTHONPATH 환경 변수 설정
+ENV PYTHONPATH=/app/dashboard_api/app/dashboard_api/app
+
 # 시스템에 필요한 최소한의 패키지 설치
 # 파이썬 패키지와, MySQL 드라이버와 연동하기 위한 파리눅스 시스템 라이브러리를 설치
 RUN apt-get update && \
@@ -40,6 +43,9 @@ FROM python:3.10-slim-bullseye
 
 # 작업 디렉토리 설정
 WORKDIR /app
+
+# PYTHONPATH 환경 변수 설정
+ENV PYTHONPATH=/app/dashboard_api/app/dashboard_api/app
 
 # appuser 사용자 생성 및 권한 설정 (보안 강화)
 # 컨테이너를 root 사용자(기본값)로 실행하는 것은 보안상 위험합니다.

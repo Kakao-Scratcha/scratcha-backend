@@ -1,0 +1,2 @@
+GRANT ALL PRIVILEGES ON `scratcha_db`.* TO 'admin'@'%';
+FLUSH PRIVILEGES;

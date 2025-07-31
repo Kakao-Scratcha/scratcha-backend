@@ -1,18 +1,17 @@
 # backend/dashboard_api/app/core/security.py
 
-from repositories.user_repo import UserRepository
-from models.user import User
-from database import get_db
+from dashboard_api.app.repositories.user_repo import UserRepository
+from dashboard_api.app.models.user import User
+from db.session import SessionLocal
+from dashboard_api.app.routers.deps import get_db
 from sqlalchemy.orm import Session
-import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends
-# OAuth2PasswordBearer와 함께 HTTPBearer를 임포트합니다.
 from fastapi.security import OAuth2PasswordBearer, HTTPBearer
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 

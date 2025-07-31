@@ -1,10 +1,9 @@
-# backend/dashboard_api/app/database.py
+# db/session.py
 
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
@@ -21,14 +20,3 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 # 세션 로컬 클래스 생성
 # 이 클래스의 인스턴스가 실제 데이터베이스 세션이 됩니다.
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# SQLAlchemy 모델의 Base 클래스 (모든 모델이 상속받을 기본)
-Base = declarative_base()
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()

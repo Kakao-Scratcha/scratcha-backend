@@ -5,9 +5,9 @@ from passlib.context import CryptContext
 from typing import Optional, List
 from datetime import datetime
 
-from models.user import User
-from repositories.user_repo import UserRepository
-from schemas.user import UserCreate, UserUpdate
+from dashboard_api.app.models.user import User
+from dashboard_api.app.repositories.user_repo import UserRepository
+from dashboard_api.app.schemas.user import UserCreate, UserUpdate
 
 
 pwdContext = CryptContext(schemes=["bcrypt"], deprecated="auto")

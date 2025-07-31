@@ -3,11 +3,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-
-from database import get_db
-from schemas.token import Token
-from schemas.user import UserLogin  # UserLogin 스키마 임포트 (아직 사용하지는 않음)
-from services.auth_service import AuthService
+from dashboard_api.app.routers.deps import get_db
+from dashboard_api.app.schemas.token import Token
+from dashboard_api.app.schemas.user import UserLogin  # UserLogin 스키마 임포트 (아직 사용하지는 않음)
+from dashboard_api.app.services.auth_service import AuthService
 
 router = APIRouter(
     prefix="/auth",

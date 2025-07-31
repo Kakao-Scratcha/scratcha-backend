@@ -2,9 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
-
-from database import engine, Base
-from routers import users, auth
+from dashboard_api.app.routers import users, auth
 
 app = FastAPI(
     title="Dashboard API",
@@ -12,9 +10,9 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# 데이터베이스 테이블 생성 (첫 실행 시 필요)
-# 프로덕션에서는 Alembic과 같은 마이그레이션 도구를 사용하는 것이 권장됩니다.
-Base.metadata.create_all(bind=engine)
+# # 데이터베이스 테이블 생성 (첫 실행 시 필요)
+# # 프로덕션에서는 Alembic과 같은 마이그레이션 도구를 사용하는 것이 권장됩니다.
+# Base.metadata.create_all(bind=engine)
 
 # CORS 미들웨어 설정 (개발 환경용)
 origins = [

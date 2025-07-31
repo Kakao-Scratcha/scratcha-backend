@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
-from models.user import User
-from schemas.user import UserCreate, UserUpdate
+from dashboard_api.app.models.user import User
+from dashboard_api.app.schemas.user import UserCreate, UserUpdate
 
 
 class UserRepository:
