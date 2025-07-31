@@ -2,7 +2,12 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
+from db.session import engine
+from sqladmin import Admin
+
 from dashboard_api.app.routers import users, auth
+from dashboard_api.app.admin import UserAdmin
+
 
 app = FastAPI(
     title="Dashboard API",
@@ -29,6 +34,10 @@ app.add_middleware(
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 헤더 허용
 )
+
+# admin 페이지 호출
+admin = Admin(app, engine)
+admin.add_view(UserAdmin)
 
 
 @app.get("/")
