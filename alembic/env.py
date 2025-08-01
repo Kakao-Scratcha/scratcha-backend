@@ -1,4 +1,5 @@
-from dashboard_api.app.models.user import Base
+
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, create_engine
@@ -11,7 +12,11 @@ from dotenv import load_dotenv
 load_dotenv() # .env 파일 로드
 
 # FastAPI 애플리케이션의 모델을 임포트
-from dashboard_api.app.models.user import Base as UserBase
+from db.base import Base
+from dashboard_api.app.models.user import User
+from dashboard_api.app.models.application import UserApplication
+from dashboard_api.app.models.test_model import TestModel
+from dashboard_api.app.models.api_key import AppApiKey
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

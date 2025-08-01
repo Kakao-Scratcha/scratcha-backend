@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
 from db.session import engine
 from sqladmin import Admin
 
-from dashboard_api.app.routers import users, auth
+from dashboard_api.app.routers import users, auth, applications
 from dashboard_api.app.admin import UserAdmin
 
 
@@ -48,3 +48,4 @@ def read_root():
 # 라우터 등록
 app.include_router(users.router, prefix="/api/dashboard")
 app.include_router(auth.router, prefix="/api/dashboard")
+app.include_router(applications.router, prefix="/api/dashboard")
