@@ -19,8 +19,8 @@ services:
     # 대시보드 API 서비스
     dashboard-api:
         build:
-            context: ./dashboard_api
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: ./dashboard_api/Dockerfile
         container_name: scratcha_dashboard_api
         env_file:
             - ./.env
