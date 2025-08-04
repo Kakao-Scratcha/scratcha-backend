@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class Token(BaseModel):
     accessToken: str
-    tokenType: str = "bearer"
+    tokenType: str = "Bearer"
 
 
 class TokenData(BaseModel):

@@ -115,7 +115,6 @@ def delete_user(
 )
 def admin_get_all_users(
     include_deleted: bool = False,  # 쿼리 파라미터로 소프트 삭제 사용자 포함 여부 선택
-    admin_user: User = Depends(get_current_admin_user),  # 관리자 권한 확인
     userService: UserService = Depends(get_user_service)
 ):
     users = userService.get_all_users_admin(include_deleted)
@@ -131,7 +130,6 @@ def admin_get_all_users(
 def admin_get_user_by_id(
     user_id: str,
     include_deleted: bool = False,
-    admin_user: User = Depends(get_current_admin_user),
     userService: UserService = Depends(get_user_service)
 ):
     user = userService.get_user_admin(user_id, include_deleted)
@@ -149,7 +147,6 @@ def admin_get_user_by_id(
 )
 def admin_restore_user(
     user_id: str,
-    admin_user: User = Depends(get_current_admin_user),
     userService: UserService = Depends(get_user_service)
 ):
     restoredUser = userService.restore_user_admin(user_id)
@@ -159,8 +156,6 @@ def admin_restore_user(
             detail="계정을 복구할 수 없습니다. 사용자를 찾을 수 없거나 삭제된 계정이 아닙니다."
         )
     return restoredUser
-
-# 관리자가 다른 사용자의 계정을 소프트 삭제하는 기능도 추가 가능
 
 
 @router.delete(

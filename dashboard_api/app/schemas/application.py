@@ -14,6 +14,9 @@ class ApplicationCreate(BaseModel):
                          max_length=100, example="애플리케이션 이름")
     description: Optional[str] = Field(
         None, max_length=500, example="애플리케이션 설명")
+    expirationPolicy: int = Field(
+        None, description="API 키 만료 정책(일 단위). 0 또는 음수는 무제한을 의미합니다.",
+        example="만료일 0은 무제한, 30은 30일 후 만료")
 
 # 애플리케이션 업데이트 요청 스키마
 
@@ -24,7 +27,7 @@ class ApplicationUpdate(BaseModel):
     description: Optional[str] = Field(
         None, max_length=500, example="애플리케이션 설명")
 
-# 애플리케이션 응답 스키마 (데이터베이스 모델을 Pydantic으로 변환)
+# 애플리케이션 응답 스키마
 
 
 class ApplicationResponse(BaseModel):
@@ -32,6 +35,7 @@ class ApplicationResponse(BaseModel):
     userId: str
     appName: str
     description: Optional[str]
+    key: Optional['ApiKeyResponse']
     createdAt: datetime
     deletedAt: Optional[datetime]
 
