@@ -5,12 +5,8 @@ from pydantic import BaseModel
 
 class Token(BaseModel):
     accessToken: str
-    tokenType: str = "Bearer"
+    tokenType: str = "bearer"
 
 
 class TokenData(BaseModel):
     email: str | None = None
-
-
-
-
