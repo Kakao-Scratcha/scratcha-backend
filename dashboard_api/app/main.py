@@ -22,17 +22,26 @@ app = FastAPI(
 # CORS 미들웨어 설정 (개발 환경용)
 origins = [
     "http://localhost",
-    "http://localhost:3000",  # 프론트엔드 개발 서버 URL
+    "http://localhost:5173",  # 프론트엔드 개발 서버 URL
     "http://localhost:80",  # Nginx
     "http://127.0.0.1:80",  # Nginx
 ]
 
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,
+#     allow_credentials=True,
+#     allow_methods=["*"],  # 모든 HTTP 메소드 허용
+#     allow_headers=["*"],  # 모든 헤더 허용
+# )
+
+# 방법 1: 모든 origin 허용 (개발 환경)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # 모든 origin 허용
     allow_credentials=True,
-    allow_methods=["*"],  # 모든 HTTP 메소드 허용
-    allow_headers=["*"],  # 모든 헤더 허용
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # admin 페이지 호출
