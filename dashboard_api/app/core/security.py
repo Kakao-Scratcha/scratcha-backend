@@ -1,7 +1,7 @@
 # backend/dashboard_api/app/core/security.py
 
 from dashboard_api.app.repositories.user_repo import UserRepository
-from dashboard_api.app.models.user import User
+from dashboard_api.app.models.user import User, UserRole
 from db.session import SessionLocal
 from dashboard_api.app.routers.deps import get_db
 from sqlalchemy.orm import Session
@@ -99,7 +99,7 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
     """
     현재 인증된 사용자가 'admin' 역할을 가지고 있는지 확인합니다.
     """
-    if current_user.role != "admin":
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="관리자 권한이 필요합니다."

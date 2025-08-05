@@ -1,6 +1,7 @@
 # backend/dashboard_api/app/models/api_key.py
 
 from sqlalchemy import Column, String, TIMESTAMP, ForeignKey, Boolean, Integer
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.sql import func
 import uuid
@@ -23,6 +24,8 @@ class AppApiKey(Base):
                        server_default=func.now(), nullable=False)
     # API 키 만료 시점. null이면 무기한
     expiresAt = Column("expires_at", TIMESTAMP, nullable=True)
+
+    application = relationship("Application", back_populates="api_keys")
 
     def __repr__(self):
         return f"<AppApiKey(id={self.id}, applicationId='{self.applicationId}', isActive={self.isActive})>"

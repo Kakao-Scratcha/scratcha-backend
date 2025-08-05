@@ -6,6 +6,9 @@ from pydantic import BaseModel, EmailStr, Field
 from pydantic.alias_generators import to_camel
 
 
+from dashboard_api.app.models.user import UserRole
+
+
 class UserCreate(BaseModel):  # 사용자 회원가입 스키마
     email: EmailStr = Field(..., example="유저 이메일")
     password: str = Field(..., min_length=8, max_length=20,
@@ -29,7 +32,7 @@ class UserResponse(BaseModel):
     id: str
     email: EmailStr
     userName: str
-    role: str
+    role: UserRole
     createdAt: datetime
     deletedAt: Optional[datetime]  # 소프트 딜리트
 

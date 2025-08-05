@@ -1,6 +1,7 @@
 # backend/dashboard_api/app/models/application.py
 
 from sqlalchemy import Column, String, TIMESTAMP, Text, ForeignKey
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.sql import func
 import uuid
@@ -19,6 +20,9 @@ class Application(Base):
     createdAt = Column("created_at", TIMESTAMP,
                        server_default=func.now(), nullable=False)
     deletedAt = Column("deleted_at", TIMESTAMP, nullable=True)
+
+    user = relationship("User", back_populates="applications")
+    api_keys = relationship("AppApiKey", back_populates="application", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Application(id={self.id}, appName='{self.appName}', userId='{self.userId}')>"

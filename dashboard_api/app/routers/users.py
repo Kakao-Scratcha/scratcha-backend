@@ -115,6 +115,7 @@ def delete_user(
 )
 def admin_get_all_users(
     include_deleted: bool = False,  # 쿼리 파라미터로 소프트 삭제 사용자 포함 여부 선택
+    adminUser: User = Depends(get_current_admin_user),
     userService: UserService = Depends(get_user_service)
 ):
     users = userService.get_all_users_admin(include_deleted)
@@ -128,11 +129,12 @@ def admin_get_all_users(
     description="관리자 권한으로 특정 사용자 계정 정보를 조회합니다 (소프트 삭제된 사용자 포함 여부 선택 가능).",
 )
 def admin_get_user_by_id(
-    user_id: str,
+    userId: str,
     include_deleted: bool = False,
+    adminUser: User = Depends(get_current_admin_user),
     userService: UserService = Depends(get_user_service)
 ):
-    user = userService.get_user_admin(user_id, include_deleted)
+    user = userService.get_user_admin(userId, include_deleted)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
@@ -146,10 +148,11 @@ def admin_get_user_by_id(
     description="관리자 권한으로 소프트 삭제된 사용자 계정을 복구합니다.",
 )
 def admin_restore_user(
-    user_id: str,
+    userId: str,
+    adminUser: User = Depends(get_current_admin_user),
     userService: UserService = Depends(get_user_service)
 ):
-    restoredUser = userService.restore_user_admin(user_id)
+    restoredUser = userService.restore_user_admin(userId)
     if not restoredUser:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -165,11 +168,11 @@ def admin_restore_user(
     description="관리자 권한으로 특정 사용자 계정을 소프트 삭제합니다.",
 )
 def admin_delete_user(
-    user_id: str,
-    admin_user: User = Depends(get_current_admin_user),
+    userId: str,
+    adminUser: User = Depends(get_current_admin_user),
     userService: UserService = Depends(get_user_service)
 ):
-    deletedUser = userService.delete_user(user_id)
+    deletedUser = userService.delete_user(userId)
     if not deletedUser:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

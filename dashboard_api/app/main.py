@@ -6,8 +6,8 @@ from db.session import engine
 from sqladmin import Admin
 
 from dashboard_api.app.routers import users, auth, applications
-from dashboard_api.app.admin import UserAdmin
-
+from dashboard_api.app.admin.admin import UserAdmin, ApplicationAdmin, AppApiKeyAdmin
+from dashboard_api.app.admin.auth import AdminAuth
 
 app = FastAPI(
     title="Dashboard API",
@@ -36,8 +36,11 @@ app.add_middleware(
 )
 
 # admin 페이지 호출
-admin = Admin(app, engine)
+authentication_backend = AdminAuth(secret_key="...")
+admin = Admin(app, engine, authentication_backend=authentication_backend)
 admin.add_view(UserAdmin)
+admin.add_view(ApplicationAdmin)
+admin.add_view(AppApiKeyAdmin)
 
 
 @app.get("/")
