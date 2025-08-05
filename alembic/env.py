@@ -1,7 +1,6 @@
 
 
 from dashboard_api.app.models.api_key import AppApiKey
-from dashboard_api.app.models.test_model import TestModel
 from dashboard_api.app.models.application import Application
 from dashboard_api.app.models.user import User
 from db.base import Base

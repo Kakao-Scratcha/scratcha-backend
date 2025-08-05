@@ -1,10 +1,8 @@
 # backend/dashboard_api/app/models/api_key.py
 
-from sqlalchemy import Column, String, TIMESTAMP, ForeignKey, Boolean, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.sql import func
-import uuid
 
 from db.base import Base
 
@@ -12,20 +10,58 @@ from db.base import Base
 class AppApiKey(Base):
     __tablename__ = "app_api_keys"
 
-    id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    userId = Column("user_id", CHAR(36), ForeignKey(
-        "auth_users.id"), nullable=False)
-    applicationId = Column("application_id", CHAR(36), ForeignKey(
-        "user_applications.id"), unique=True, nullable=False)
-    key = Column("key", String(255), unique=True, nullable=False)
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True
+    )
+
+    userId = Column(
+        "user_id",
+        Integer,
+        ForeignKey("auth_users.id"),
+        nullable=False
+    )
+
+    appId = Column(
+        "application_id",
+        Integer,
+        ForeignKey("user_applications.id"),
+        nullable=False
+    )
+
+    key = Column(
+        "key",
+        String(255),
+        unique=True,
+        nullable=False
+    )
     # 키 활성: 기본값=True
-    isActive = Column("is_active", Boolean, default=True, nullable=False)
-    createdAt = Column("created_at", TIMESTAMP,
-                       server_default=func.now(), nullable=False)
+    isActive = Column(
+        "is_active",
+        Boolean,
+        default=True,
+        nullable=False
+    )
+
+    createdAt = Column(
+        "created_at",
+        DateTime,
+        server_default=func.now(),
+        nullable=False
+    )
+
+    updatedAt = Column(
+        "updated_at",
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
+    )
     # API 키 만료 시점. null이면 무기한
-    expiresAt = Column("expires_at", TIMESTAMP, nullable=True)
+    expiresAt = Column("expires_at", DateTime, nullable=True)
 
     application = relationship("Application", back_populates="api_keys")
 
     def __repr__(self):
-        return f"<AppApiKey(id={self.id}, applicationId='{self.applicationId}', isActive={self.isActive})>"
+        return f"<AppApiKey(id={self.id}, appId='{self.appId}', isActive={self.isActive})>"

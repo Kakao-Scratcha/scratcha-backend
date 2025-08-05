@@ -37,7 +37,7 @@ class UserAdmin(ModelView, model=User):
         User.createdAt,
         User.deletedAt,
     )
-    column_default_sort = (User.email, False)
+    column_default_sort = (User.id, False)
 
     column_searchable_list = (User.email, User.role)
 
@@ -84,7 +84,7 @@ class ApplicationAdmin(ModelView, model=Application):
         Application.createdAt,
         Application.deletedAt,
     ]
-    column_default_sort = (Application.appName, False)
+    column_default_sort = (Application.id, False)
 
     column_searchable_list = [
         Application.appName,
@@ -124,7 +124,7 @@ class AppApiKeyAdmin(ModelView, model=AppApiKey):
 
     column_list = [
         AppApiKey.id,
-        AppApiKey.applicationId,
+        AppApiKey.appId,
         AppApiKey.key,
         AppApiKey.isActive,
         AppApiKey.createdAt,
@@ -132,22 +132,22 @@ class AppApiKeyAdmin(ModelView, model=AppApiKey):
     ]
     column_sortable_list = [
         AppApiKey.id,
-        AppApiKey.applicationId,
+        AppApiKey.appId,
         AppApiKey.key,
         AppApiKey.isActive,
         AppApiKey.createdAt,
         AppApiKey.expiresAt,
     ]
-    column_default_sort = (AppApiKey.createdAt, True)
+    column_default_sort = (AppApiKey.id, False)
 
     column_searchable_list = [
-        AppApiKey.applicationId,
+        AppApiKey.appId,
         AppApiKey.userId
     ]
 
     column_labels = {
         AppApiKey.id: "Api Key ID",
-        AppApiKey.applicationId: "App ID",
+        AppApiKey.appId: "App ID",
         AppApiKey.key: "API Key",
         AppApiKey.isActive: "Active",
         AppApiKey.createdAt: "Created At",

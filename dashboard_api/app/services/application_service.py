@@ -82,7 +82,7 @@ class ApplicationService:
 
         # API 키 객체 생성 (메모리)
         apiKey = self.apiKeyRepo.create_api_key(
-            userId=currentUser.id, applicationId=app.id, expiration_policy_days=appCreate.expirationPolicy)
+            userId=currentUser.id, appId=app.id, expiration_policy_days=appCreate.expirationPolicy)
 
         try:
             # 모든 변경사항을 한번에 커밋
