@@ -46,6 +46,20 @@ class User(Base):
         nullable=False
     )
 
+    subscribe = Column(
+        "subscribe",
+        String(20),
+        default="free",
+        nullable=False
+    )
+
+    token = Column(
+        "token",
+        Integer,
+        default=1000,
+        nullable=False
+    )
+
     createdAt = Column(
         "created_at",
         DateTime,

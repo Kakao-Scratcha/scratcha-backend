@@ -67,7 +67,10 @@ class UserResponse(BaseModel):
     email: EmailStr
     userName: str
     role: UserRole
+    subscribe: str
+    token: int
     createdAt: datetime
+    updatedAt: datetime
     deletedAt: Optional[datetime]  # 소프트 딜리트
 
     class Config:

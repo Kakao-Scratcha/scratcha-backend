@@ -12,9 +12,13 @@ from dashboard_api.app.repositories.application_repo import ApplicationRepositor
 from dashboard_api.app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
 from dashboard_api.app.schemas.api_key import ApiKeyResponse
 
-# 애플리케이션 최대 허용 개수 상수 정의
-# TODO: 후에 요금제별로 생성 가능한 애플리케이션 개수를 조정할 수 있도록 변경
-MAX_APPLICATIONS_PER_USER = 5
+# 사용자 구독 상태에 따른 최대 애플리케이션 개수 설정
+MAX_APPLICATIONS_PER_USER = {
+    "free": 1,
+    "starter": 3,
+    "pro": 5,
+    "enterprise": -1  # 무제한
+}
 
 
 class ApplicationService:
@@ -34,8 +38,10 @@ class ApplicationService:
                 id=apiKey.id,
                 key=apiKey.key,
                 isActive=apiKey.isActive,
-                createdAt=apiKey.createdAt,
                 expiresAt=apiKey.expiresAt,
+                createdAt=apiKey.createdAt,
+                updatedAt=apiKey.updatedAt,
+                deletedAt=apiKey.deletedAt
             )
         return ApplicationResponse(
             id=app.id,
@@ -65,12 +71,24 @@ class ApplicationService:
     def create_application(self, currentUser: User, appCreate: ApplicationCreate) -> ApplicationResponse:
         """애플리케이션과 API 키를 원자적으로 생성합니다."""
 
-        # 사용자별 애플리케이션 개수 제한
-        apps = self.appRepo.get_applications_by_user_id(currentUser.id)
-        if len(apps) >= MAX_APPLICATIONS_PER_USER:
+        # 애플리케이션 생성 시, 현재 사용자의 구독 상태에 따라 최대 애플리케이션 개수를 결정합니다.
+        maxApps = MAX_APPLICATIONS_PER_USER.get(currentUser.subscribe)
+
+        if maxApps is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="유효하지 않은 구독 상태입니다."
+            )
+
+        # 현재 사용자의 애플리케이션 개수를 조회
+        currentAppsCount = self.appRepo.get_applications_count_by_user_id(
+            currentUser.id)
+
+        # 최대 애플리케이션 개수를 초과하는 경우 예외 처리
+        if maxApps != -1 and currentAppsCount >= maxApps:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"사용자의 애플리케이션 개수를 초과했습니다. 최대 {MAX_APPLICATIONS_PER_USER}개"
+                detail=f"현재 구독 플랜({currentUser.subscribe})으로는 최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
             )
 
         # 애플리케이션 객체 생성 (메모리)

@@ -11,9 +11,10 @@ class ApiKeyResponse(BaseModel):
     id: int
     key: str = Field(..., description="발급된 API 키 문자열")
     isActive: bool
+    expiresAt: Optional[datetime]
     createdAt: datetime
-    expiresAt: Optional[datetime] = Field(
-        None, description="API 키 만료 시점. null이면 무기한")
+    updatedAt: datetime
+    deletedAt: Optional[datetime]
 
     class Config:
         from_attributes = True

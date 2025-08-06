@@ -44,6 +44,12 @@ class AppApiKey(Base):
         nullable=False
     )
 
+    expiresAt = Column(
+        "expires_at",
+        DateTime,
+        nullable=True
+    )
+
     createdAt = Column(
         "created_at",
         DateTime,
@@ -58,8 +64,12 @@ class AppApiKey(Base):
         onupdate=func.now(),
         nullable=False
     )
-    # API 키 만료 시점. null이면 무기한
-    expiresAt = Column("expires_at", DateTime, nullable=True)
+
+    deletedAt = Column(
+        "deleted_at",
+        DateTime,
+        nullable=True
+    )
 
     application = relationship("Application", back_populates="api_keys")
 

@@ -31,6 +31,14 @@ class ApplicationRepository:
 
         return self.db.query(Application).filter(Application.userId == userId, Application.deletedAt.is_(None)).all()
 
+    # 애플리케이션 갯수 조회 CRUD
+    def get_applications_count_by_user_id(self, userId: str) -> int:
+        """특정 사용자의 애플리케이션 개수를 조회합니다."""
+        return self.db.query(Application).filter(
+            Application.userId == userId,
+            Application.deletedAt.is_(None)
+        ).count()
+
     # 애플리케이션 단일 조회 CRUD
     def get_application_by_id(self, appId: str) -> Application:
         """애플리케이션 ID로 단일 애플리케이션을 조회합니다."""
