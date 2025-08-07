@@ -10,7 +10,11 @@ from dashboard_api.app.schemas.api_key import ApiKeyResponse
 from dashboard_api.app.core.security import get_current_user
 from dashboard_api.app.models.user import User
 
-router = APIRouter(prefix="/api-key", tags=["api_key"])
+router = APIRouter(
+    prefix="/api-keys",
+    tags=["api-keys"],
+    responses={404: {"description": "Not found"}},
+)
 
 
 def service(db: Session = Depends(get_db)) -> ApiKeyService:

@@ -12,7 +12,6 @@ router = APIRouter(
     prefix="/auth",
     tags=["auth"],
     responses={404: {"description": "Not found"}},
-
 )
 
 # get_auth_service 의존성

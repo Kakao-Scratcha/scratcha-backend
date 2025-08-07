@@ -11,10 +11,9 @@ from dashboard_api.app.core.security import get_current_user, get_current_admin_
 from dashboard_api.app.models.user import User
 
 router = APIRouter(
-    prefix="/users",  # 이 라우터의 모든 경로에 자동으로 /users/ 가 붙음
+    prefix="/users",
     tags=["users"],
     responses={404: {"description": "Not found"}},
-
 )
 
 # get_user_service 의존성 함수 (서비스 객체 생성 및 주입)

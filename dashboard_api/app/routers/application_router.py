@@ -10,7 +10,11 @@ from dashboard_api.app.routers.deps_router import get_db
 from dashboard_api.app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationResponse
 from dashboard_api.app.services.application_service import ApplicationService
 
-router = APIRouter(prefix="/application", tags=["application"])
+router = APIRouter(
+    prefix="/applications",
+    tags=["applications"],
+    responses={404: {"description": "Not found"}},
+)
 
 
 def service(db: Session = Depends(get_db)) -> ApplicationService:  # 의존성 주입을 통해 데이터베이스 세션을 가져오는 함수
