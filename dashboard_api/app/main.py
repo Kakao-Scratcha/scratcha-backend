@@ -5,9 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
 from db.session import engine
 from sqladmin import Admin
 
-from dashboard_api.app.routers import users, auth, applications
+from dashboard_api.app.routers import users_router
 from dashboard_api.app.admin.admin import UserAdmin, ApplicationAdmin, AppApiKeyAdmin
 from dashboard_api.app.admin.auth import AdminAuth
+from dashboard_api.app.routers import api_key_router, auth_router
+from dashboard_api.app.routers import application_router
 
 app = FastAPI(
     title="Dashboard API",
@@ -29,7 +31,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 헤더 허용
@@ -49,6 +51,7 @@ def read_root():
 
 
 # 라우터 등록
-app.include_router(users.router, prefix="/api/dashboard")
-app.include_router(auth.router, prefix="/api/dashboard")
-app.include_router(applications.router, prefix="/api/dashboard")
+app.include_router(users_router.router, prefix="/api/dashboard")
+app.include_router(auth_router.router, prefix="/api/dashboard")
+app.include_router(application_router.router, prefix="/api/dashboard")
+app.include_router(api_key_router.router, prefix="/api/dashboard")

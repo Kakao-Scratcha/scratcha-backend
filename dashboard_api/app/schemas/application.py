@@ -17,12 +17,12 @@ class ApplicationCreate(BaseModel):
         example="애플리케이션 이름"
     )
     description: Optional[str] = Field(
-        None,
+        ...,
         max_length=500,
         example="애플리케이션 설명"
     )
-    expirationPolicy: int = Field(
-        None,
+    expiresPolicy: int = Field(
+        ...,
         description="API 키 만료 정책(일 단위). 0 또는 음수는 무제한을 의미합니다.",
         example=0
     )
@@ -31,6 +31,7 @@ class ApplicationCreate(BaseModel):
 
 
 class ApplicationUpdate(BaseModel):
+
     appName: Optional[str] = Field(
         None,
         min_length=1,
@@ -51,8 +52,9 @@ class ApplicationResponse(BaseModel):
     userId: int
     appName: str
     description: Optional[str]
-    key: Optional['ApiKeyResponse']
+    key: Optional[ApiKeyResponse] = None  # API 키 정보 (선택적)
     createdAt: datetime
+    updatedAt: datetime
     deletedAt: Optional[datetime]
 
     class Config:

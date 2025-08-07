@@ -1,6 +1,6 @@
 # backend/dashboard_api/app/models/user.py
 
-from sqlalchemy import Column, String, DateTime, Text, Enum, Integer
+from sqlalchemy import Column, String, DateTime, Enum, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -11,6 +11,13 @@ from db.base import Base
 class UserRole(enum.Enum):
     ADMIN = "admin"
     USER = "user"
+
+
+class UserSubscription(enum.Enum):
+    FREE = "free"
+    STARTER = "starter"
+    PRO = "pro"
+    ENTERPRISE = "enterprise"
 
 
 class User(Base):
@@ -47,9 +54,8 @@ class User(Base):
     )
 
     subscribe = Column(
-        "subscribe",
-        String(20),
-        default="free",
+        Enum(UserSubscription),
+        default=UserSubscription.FREE,
         nullable=False
     )
 

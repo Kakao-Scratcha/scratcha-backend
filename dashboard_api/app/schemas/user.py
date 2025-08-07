@@ -5,7 +5,7 @@ from typing import Optional, Annotated
 from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
 from pydantic.alias_generators import to_camel
 
-from dashboard_api.app.models.user import UserRole
+from dashboard_api.app.models.user import UserRole, UserSubscription
 
 
 class UserCreate(BaseModel):  # 사용자 회원가입 스키마
@@ -67,7 +67,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     userName: str
     role: UserRole
-    subscribe: str
+    subscribe: UserSubscription
     token: int
     createdAt: datetime
     updatedAt: datetime

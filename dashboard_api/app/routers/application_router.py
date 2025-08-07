@@ -6,11 +6,11 @@ from typing import List
 
 from dashboard_api.app.models.user import User
 from dashboard_api.app.core.security import get_current_user
-from dashboard_api.app.routers.deps import get_db
+from dashboard_api.app.routers.deps_router import get_db
 from dashboard_api.app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationResponse
 from dashboard_api.app.services.application_service import ApplicationService
 
-router = APIRouter(prefix="/applications", tags=["applications"])
+router = APIRouter(prefix="/application", tags=["application"])
 
 
 def service(db: Session = Depends(get_db)) -> ApplicationService:  # 의존성 주입을 통해 데이터베이스 세션을 가져오는 함수
@@ -55,7 +55,7 @@ def get_applications(
     description="애플리케이션 ID로 단일 애플리케이션을 조회합니다.",
 )
 def get_application(
-    appId: str,  # 애플리케이션 ID
+    appId: int,  # 애플리케이션 ID
     currentUser: User = Depends(get_current_user),  # 현재 인증된 사용자 정보 가져오기
     service: ApplicationService = Depends(service)
 ):
@@ -64,7 +64,7 @@ def get_application(
 
 @router.patch(
     "/{app_id}",
-    response_model=ApplicationUpdate,
+    response_model=ApplicationResponse,
     status_code=status.HTTP_200_OK,
     summary="애플리케이션 정보 업데이트",
     description="애플리케이션 정보를 업데이트합니다.",

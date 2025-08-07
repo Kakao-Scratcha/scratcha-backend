@@ -11,6 +11,7 @@ from dashboard_api.app.repositories.api_key_repo import AppApiKeyRepository
 from dashboard_api.app.repositories.application_repo import ApplicationRepository
 from dashboard_api.app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
 from dashboard_api.app.schemas.api_key import ApiKeyResponse
+from dashboard_api.app.services.api_key_service import ApiKeyService
 
 # 사용자 구독 상태에 따른 최대 애플리케이션 개수 설정
 MAX_APPLICATIONS_PER_USER = {
@@ -28,179 +29,136 @@ class ApplicationService:
         self.appRepo = ApplicationRepository(db)
         self.apiKeyRepo = AppApiKeyRepository(db)
 
-    def map_to_application_response(self, app: Application, apiKey: AppApiKey) -> ApplicationResponse:
-        """Application 및 AppApiKey 모델을 ApplicationResponse 스키마로 매핑합니다."""
+    def map_to_application_response(self, app: Application, key: AppApiKey) -> ApplicationResponse:
+        """애플리케이션과 API 키 정보를 ApplicationResponse로 매핑합니다."""
 
-        # API 키가 존재하지 않는 경우 None으로 설정
-        apiKeyResponse = None
-        if apiKey:
-            apiKeyResponse = ApiKeyResponse(
-                id=apiKey.id,
-                key=apiKey.key,
-                isActive=apiKey.isActive,
-                expiresAt=apiKey.expiresAt,
-                createdAt=apiKey.createdAt,
-                updatedAt=apiKey.updatedAt,
-                deletedAt=apiKey.deletedAt
-            )
         return ApplicationResponse(
             id=app.id,
             userId=app.userId,
             appName=app.appName,
             description=app.description,
+            key=ApiKeyResponse(
+                id=key.id,
+                key=key.key,
+                isActive=key.isActive,
+                expiresAt=key.expiresAt,
+                createdAt=key.createdAt,
+                updatedAt=key.updatedAt,
+                deletedAt=key.deletedAt
+            ) if key else None,
             createdAt=app.createdAt,
-            deletedAt=app.deletedAt,
-            key=apiKeyResponse
+            updatedAt=app.updatedAt,
+            deletedAt=app.deletedAt
         )
 
-    def _get_and_validate_application(self, appId: str, currentUser: User) -> Application:
-        """ID로 앱을 조회하고 사용자가 소유자인지 확인합니다."""
-        app = self.appRepo.get_application_by_id(appId)
-        if not app:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="애플리케이션을 찾을 수 없습니다."
-            )
-        if app.userId != currentUser.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="해당 애플리케이션에 대한 접근 권한이 없습니다."
-            )
-        return app
-
     def create_application(self, currentUser: User, appCreate: ApplicationCreate) -> ApplicationResponse:
-        """애플리케이션과 API 키를 원자적으로 생성합니다."""
+        """애플리케이션과 API 키를 생성합니다."""
 
-        # 애플리케이션 생성 시, 현재 사용자의 구독 상태에 따라 최대 애플리케이션 개수를 결정합니다.
-        maxApps = MAX_APPLICATIONS_PER_USER.get(currentUser.subscribe)
+        # 1. 사용자가 구독한 요금제를 확인.
+        maxApps = MAX_APPLICATIONS_PER_USER.get(currentUser.subscribe.value)
 
         if maxApps is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="유효하지 않은 구독 상태입니다."
+                detail="[app_service] 유효하지 않은 구독 상태입니다."
             )
 
-        # 현재 사용자의 애플리케이션 개수를 조회
+        # 2. 사용자의 애플리케이션 개수를 조회
         currentAppsCount = self.appRepo.get_applications_count_by_user_id(
             currentUser.id)
 
-        # 최대 애플리케이션 개수를 초과하는 경우 예외 처리
+        # 3. 최대 애플리케이션 개수를 초과하는 경우 예외 처리
         if maxApps != -1 and currentAppsCount >= maxApps:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"현재 구독 플랜({currentUser.subscribe})으로는 최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
+                detail=f"[app_service] 현재 구독 플랜({currentUser.subscribe.value})로는 최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
             )
 
-        # 애플리케이션 객체 생성 (메모리)
+        # 4. 애플리케이션을 생성합니다.
         app = self.appRepo.create_application(currentUser.id, appCreate)
 
-        # 변경사항을 flush하여 데이터베이스로부터 app.id를 할당받음
-        # 트랜잭션은 아직 열려있어 오류 발생 시 전체 롤백 가능
-        self.db.flush()
+        # 5. API 키를 생성합니다.
+        key = self.apiKeyRepo.create_key(
+            userId=currentUser.id,
+            appId=app.id,
+            expiresPolicy=appCreate.expiresPolicy
+        )
 
-        # API 키 객체 생성 (메모리)
-        apiKey = self.apiKeyRepo.create_api_key(
-            userId=currentUser.id, appId=app.id, expiration_policy_days=appCreate.expirationPolicy)
-
-        try:
-            # 모든 변경사항을 한번에 커밋
-            self.db.commit()
-        except Exception as e:
-            # 커밋 중 오류 발생 시 롤백하여 데이터 일관성 유지
-            self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"데이터베이스 처리 중 오류가 발생했습니다: {e}"
-            )
-
-        # 데이터베이스의 최신 상태를 객체에 반영
-        self.db.refresh(app)
-        self.db.refresh(apiKey)
-
-        return self.map_to_application_response(app, apiKey)
+        return self.map_to_application_response(app, key)
 
     def get_applications(self, currentUser: User) -> List[ApplicationResponse]:
-        """특정 사용자의 모든 애플리케이션을 조회합니다."""
+        """사용자의 모든 애플리케이션을 조회합니다."""
 
-        # 사용자의 애플리케이션 목록을 조회
+        # 1. 사용자의 애플리케이션 목록을 조회
         apps = self.appRepo.get_applications_by_user_id(currentUser.id)
+        keys = self.apiKeyRepo.get_keys_by_user_id(currentUser.id)
 
-        # 사용자의 애플리케이션이 없는 경우 예외 처리
+        # 2. 사용자의 애플리케이션이 없는 경우 예외 처리
         if not apps:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="사용자의 애플리케이션을 찾을 수 없습니다."
+                detail="[app_service] 사용자의 애플리케이션을 찾을 수 없습니다."
             )
 
-        # 각 애플리케이션에 대한 API 키 조회 및 매핑
-        appResponses = []
-        for app in apps:
-            apiKey = self.apiKeyRepo.get_api_key_by_app_id(app.id)
-            appResponses.append(
-                self.map_to_application_response(app, apiKey))
+        return [
+            self.map_to_application_response(app, next(
+                (key for key in keys if key.appId == app.id), None))
+            for app in apps
+        ]
 
-        return appResponses
-
-    def get_application(self, appId: str, currentUser: User) -> ApplicationResponse:
+    def get_application(self, appId: int, currentUser: User) -> ApplicationResponse:
         """애플리케이션 ID로 단일 애플리케이션을 조회합니다."""
-        app = self._get_and_validate_application(appId, currentUser)
-        apiKey = self.apiKeyRepo.get_api_key_by_app_id(app.id)
-        return self.map_to_application_response(app, apiKey)
+
+        # 1. 애플리케이션을 조회합니다.
+        app = self.appRepo.get_application_by_app_id(appId)
+        key = self.apiKeyRepo.get_key_by_app_id(appId)
+
+        # 2. 애플리케이션이 없는 경우 예외 처리
+        if not app or app.userId != currentUser.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="[app_service] 애플리케이션을 찾을 수 없습니다."
+            )
+
+        return self.map_to_application_response(app, key)
 
     def update_application(self, appId: str, currentUser: User, appUpdate: ApplicationUpdate) -> ApplicationResponse:
-        """애플리케이션 정보를 원자적으로 업데이트합니다."""
-        app = self._get_and_validate_application(appId, currentUser)
+        """애플리케이션 정보를 업데이트합니다."""
 
-        # 업데이트할 필드가 없으면 오류 발생
-        if not appUpdate.dict(exclude_unset=True):
+        # 1. 애플리케이션을 조회합니다.
+        app = self.appRepo.get_application_by_app_id(appId)
+        key = self.apiKeyRepo.get_key_by_app_id(appId)
+
+        # 2. 애플리케이션이 없는 경우 예외 처리
+        if not app or app.userId != currentUser.id:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="업데이트할 필드를 지정해야 합니다."
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="[app_service] 애플리케이션을 찾을 수 없습니다."
             )
 
-        # 애플리케이션 정보 업데이트 (메모리)
+        # 3. 애플리케이션 정보를 업데이트합니다.
         updatedApp = self.appRepo.update_application(app, appUpdate)
-        apiKey = self.apiKeyRepo.get_api_key_by_app_id(updatedApp.id)
 
-        try:
-            # 변경사항을 커밋
-            self.db.commit()
-        except Exception as e:
-            # 커밋 중 오류 발생 시 롤백
-            self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"데이터베이스 처리 중 오류가 발생했습니다: {e}"
-            )
-
-        # 최신 상태를 객체에 반영
-        self.db.refresh(updatedApp)
-        if apiKey:
-            self.db.refresh(apiKey)
-
-        return self.map_to_application_response(updatedApp, apiKey)
+        return self.map_to_application_response(updatedApp, key)
 
     def delete_application(self, appId: str, currentUser: User) -> ApplicationResponse:
         """애플리케이션을 소프트 삭제하고 연결된 API 키를 비활성화합니다."""
-        app = self._get_and_validate_application(appId, currentUser)
 
-        # 연결된 API 키를 조회합니다.
-        apiKey = self.apiKeyRepo.get_api_key_by_app_id(app.id)
+        # 1. 애플리케이션을 조회합니다.
+        app = self.appRepo.get_application_by_app_id(appId)
+        key = self.apiKeyRepo.get_key_by_app_id(appId)
 
-        # API 키가 존재하면 비활성화합니다.
-        if apiKey:
-            self.apiKeyRepo.deactivate_api_key(apiKey)
+        # 2. 애플리케이션이 없는 경우 예외 처리
+        if not app or app.userId != currentUser.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="[app_service] 애플리케이션을 찾을 수 없습니다."
+            )
 
-        # 애플리케이션을 소프트 삭제합니다.
-        deleted_app = self.appRepo.delete_application(app)
+        # 3. 애플리케이션을 소프트 삭제합니다.
+        self.appRepo.delete_application(appId)
 
-        # 서비스 계층에서 모든 변경사항을 한번에 커밋합니다.
-        self.db.commit()
+        # 4. 연결된 API 키를 삭제합니다.
+        self.apiKeyRepo.delete_key(key.id)
 
-        # 커밋 후, 데이터베이스의 최종 상태를 객체에 반영합니다.
-        self.db.refresh(deleted_app)
-        if apiKey:
-            self.db.refresh(apiKey)
-
-        # 삭제된 애플리케이션과 최종 상태의 API 키 정보를 함께 반환합니다.
-        return self.map_to_application_response(deleted_app, apiKey)
+        return self.map_to_application_response(app, key)

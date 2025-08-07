@@ -1,9 +1,5 @@
 # backend/dashboard_api/app/core/security.py
 
-from dashboard_api.app.repositories.user_repo import UserRepository
-from dashboard_api.app.models.user import User, UserRole
-from db.session import SessionLocal
-from dashboard_api.app.routers.deps import get_db
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
@@ -12,6 +8,11 @@ from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer, HTTPBearer
 from dotenv import load_dotenv
 import os
+
+from dashboard_api.app.repositories.user_repo import UserRepository
+from dashboard_api.app.models.user import User, UserRole
+from dashboard_api.app.routers.deps_router import get_db
+
 
 load_dotenv()
 

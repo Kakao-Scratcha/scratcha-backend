@@ -1,8 +1,8 @@
 """init database
 
-Revision ID: 990942cacaf8
+Revision ID: 672a86a81545
 Revises: 
-Create Date: 2025-08-05 06:26:41.229034
+Create Date: 2025-08-06 08:51:29.365416
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '990942cacaf8'
+revision: str = '672a86a81545'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -27,6 +27,8 @@ def upgrade() -> None:
     sa.Column('password_hash', sa.String(length=255), nullable=False),
     sa.Column('user_name', sa.String(length=100), nullable=True),
     sa.Column('role', sa.Enum('ADMIN', 'USER', name='userrole'), nullable=False),
+    sa.Column('subscribe', sa.Enum('FREE', 'STARTER', 'PRO', 'ENTERPRISE', name='usersubscription'), nullable=False),
+    sa.Column('token', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('deleted_at', sa.DateTime(), nullable=True),
@@ -50,9 +52,10 @@ def upgrade() -> None:
     sa.Column('application_id', sa.Integer(), nullable=False),
     sa.Column('key', sa.String(length=255), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('expires_at', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('expires_at', sa.DateTime(), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['application_id'], ['user_applications.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['auth_users.id'], ),
     sa.PrimaryKeyConstraint('id'),
