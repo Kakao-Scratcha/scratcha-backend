@@ -225,5 +225,7 @@ pyrightconfig.json
 .history
 .ionide
 
+# 기타
+nginx/
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,python

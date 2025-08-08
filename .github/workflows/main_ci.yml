@@ -1,0 +1,75 @@
+name: CI/CD Pipeline
+
+on:
+    push:
+        branches:
+            - develop
+    pull_request:
+        branches:
+            - develop
+
+jobs:
+    build-and-test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build Docker image
+              run: docker compose build
+
+            - name: Run tests (if any)
+              run: echo "No tests defined yet. Add your test commands here."
+
+    deploy:
+        needs: build-and-test # build-and-test 잡이 성공해야 deploy 잡이 실행됩니다.
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/develop' # develop 브랜치에 푸시될 때만 배포를 진행합니다.
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Log in to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  push: true
+                  tags: ${{ secrets.DOCKER_IMAGE }}:latest
+
+            - name: Deploy to server via Bastion
+              env:
+                  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+                  SSH_HOST: ${{ secrets.SSH_HOST }} # 베스천 호스트의 퍼블릭 IP
+                  SSH_USERNAME: ${{ secrets.SSH_USERNAME }} # 베스천 호스트 사용자 이름
+                  BACKEND_HOST: ${{ secrets.BACKEND_HOST }} # 백엔드 인스턴스의 프라이빗 IP
+                  BACKEND_USERNAME: ${{ secrets.BACKEND_USERNAME }} # 백엔드 인스턴스 사용자 이름
+                  REMOTE_APP_PATH: /home/ubuntu # 백엔드 인스턴스 내 프로젝트 경로
+              run: |
+                  # SSH Private Key를 SSH Agent에 추가하여 비밀번호 없이 접속할 수 있도록 합니다.
+                  echo "$SSH_PRIVATE_KEY" | ssh-add -
+
+                  # 서버의 호스트 키를 known_hosts에 추가하여 SSH 접속 시 확인 과정을 건너뜁니다.
+                  mkdir -p ~/.ssh
+                  ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+                  ssh-keyscan -H "$BACKEND_HOST" >> ~/.ssh/known_hosts
+
+                  # SSH ProxyCommand를 사용하여 베스천을 통해 백엔드 인스턴스에 접속합니다.
+                  # 기존 컨테이너 중지 및 삭제 후 새 컨테이너 실행
+                  ssh -o StrictHostKeyChecking=no \
+                      -o ProxyCommand="ssh -W %h:%p ${{ env.SSH_USERNAME }}@${{ env.SSH_HOST }}" \
+                      "${{ env.BACKEND_USERNAME }}@${{ env.BACKEND_HOST }}" \
+                      "docker stop scratcha_server || true && docker rm scratcha_server || true && docker pull ${{ secrets.DOCKER_IMAGE }}:latest && docker run -d --name scratcha_server --env-file /home/${{ env.BACKEND_USERNAME }}/.env -p 8001:8001 ${{ secrets.DOCKER_IMAGE }}:latest"
