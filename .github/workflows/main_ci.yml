@@ -50,18 +50,19 @@ jobs:
                   push: true
                   tags: ${{ secrets.DOCKER_IMAGE }}:latest
 
+            - name: Set up SSH Agent
+              uses: webfactory/ssh-agent@v0.9.0
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
             - name: Deploy to server via Bastion
               env:
-                  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
                   SSH_HOST: ${{ secrets.SSH_HOST }} # 베스천 호스트의 퍼블릭 IP
                   SSH_USERNAME: ${{ secrets.SSH_USERNAME }} # 베스천 호스트 사용자 이름
                   BACKEND_HOST: ${{ secrets.BACKEND_HOST }} # 백엔드 인스턴스의 프라이빗 IP
                   BACKEND_USERNAME: ${{ secrets.BACKEND_USERNAME }} # 백엔드 인스턴스 사용자 이름
                   REMOTE_APP_PATH: /home/ubuntu # 백엔드 인스턴스 내 프로젝트 경로
               run: |
-                  # SSH Private Key를 SSH Agent에 추가하여 비밀번호 없이 접속할 수 있도록 합니다.
-                  echo "$SSH_PRIVATE_KEY" | ssh-add -
-
                   # 서버의 호스트 키를 known_hosts에 추가하여 SSH 접속 시 확인 과정을 건너뜁니다.
                   mkdir -p ~/.ssh
                   ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
