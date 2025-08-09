@@ -55,7 +55,7 @@ jobs:
               with:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-            - name: Deploy to server via Bastion (수정)
+            - name: Deploy to server via Bastion (디버깅용 수정)
               env:
                   SSH_HOST: ${{ secrets.SSH_HOST }}
                   SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
@@ -66,8 +66,9 @@ jobs:
                   set -x
 
                   mkdir -p ~/.ssh
-                  ssh-keyscan -v -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>&1
-                  ssh-keyscan -v -H "$BACKEND_HOST" >> ~/.ssh/known_hosts 2>&1
+                  # 오류 메시지를 콘솔에 바로 출력하도록 2>&1 부분을 제거
+                  ssh-keyscan -v -H "$SSH_HOST" >> ~/.ssh/known_hosts
+                  ssh-keyscan -v -H "$BACKEND_HOST" >> ~/.ssh/known_hosts
 
                   # SSH ProxyCommand를 한 줄로 수정
                   ssh -v -o StrictHostKeyChecking=no -o ProxyCommand="ssh -v -W %h:%p ${{ env.SSH_USERNAME }}@${{ env.SSH_HOST }}" "${{ env.BACKEND_USERNAME }}@${{ env.BACKEND_HOST }}" "docker stop scratcha_server || true && docker rm scratcha_server || true && docker pull ${{ secrets.DOCKER_IMAGE }}:latest && docker run -d --name scratcha_server --env-file /home/${{ env.BACKEND_USERNAME }}/.env -p 8001:8001 ${{ secrets.DOCKER_IMAGE }}:latest"
