@@ -10,7 +10,7 @@ on:
 
 jobs:
     build-and-test:
-        runs-on: self-hosted # <-- 이 부분을 self-hosted로 변경합니다.
+        runs-on: self-hosted
 
         steps:
             - name: Checkout code
@@ -20,14 +20,14 @@ jobs:
               uses: docker/setup-buildx-action@v3
 
             - name: Build Docker image
-              run: docker-compose build
+              run: docker build -t ${{ secrets.DOCKER_IMAGE }}:latest .
 
             - name: Run tests (if any)
               run: echo "No tests defined yet. Add your test commands here."
 
     deploy:
         needs: build-and-test
-        runs-on: self-hosted # <-- 이 부분을 self-hosted로 변경합니다.
+        runs-on: self-hosted
         if: github.ref == 'refs/heads/develop'
 
         steps:
