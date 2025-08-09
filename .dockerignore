@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.log
+.env
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Docker
+Dockerfile
+docker-compose.yml
+
+# Data
+db_data/
+alembic/__pycache__/
+db/__pycache__/
+
+# Documentation/Other
+README.md

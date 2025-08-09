@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+mysqlclient
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+sqladmin
+pymysql
+email-validator
+itsdangerous
+alembic
