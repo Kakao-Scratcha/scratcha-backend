@@ -93,12 +93,12 @@ class ApplicationService:
         apps = self.appRepo.get_applications_by_user_id(currentUser.id)
         keys = self.apiKeyRepo.get_keys_by_user_id(currentUser.id)
 
-        # 2. 사용자의 애플리케이션이 없는 경우 예외 처리
-        if not apps:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="[app_service] 사용자의 애플리케이션을 찾을 수 없습니다."
-            )
+        # 2. 사용자의 애플리케이션이 없는 경우 예외 처리 -> 빈배열 반환으로 수정 (2025.08.11)
+        # if not apps:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_404_NOT_FOUND,
+        #         detail="[app_service] 사용자의 애플리케이션을 찾을 수 없습니다."
+        #     )
 
         return [
             self.map_to_application_response(app, next(
