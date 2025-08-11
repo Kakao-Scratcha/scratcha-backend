@@ -52,7 +52,7 @@ def get_applications(
 
 
 @router.get(
-    "/{app_id}",
+    "/{appId}",
     response_model=ApplicationResponse,
     status_code=status.HTTP_200_OK,
     summary="애플리케이션 단일 조회",
@@ -67,7 +67,7 @@ def get_application(
 
 
 @router.patch(
-    "/{app_id}",
+    "/{appId}",
     response_model=ApplicationResponse,
     status_code=status.HTTP_200_OK,
     summary="애플리케이션 정보 업데이트",
@@ -84,7 +84,7 @@ def update_application(
 
 
 @router.delete(
-    "/{app_id}",
+    "/{appId}",
     response_model=ApplicationResponse,
     status_code=status.HTTP_200_OK,
     summary="애플리케이션 소프트 삭제",

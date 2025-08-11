@@ -55,7 +55,7 @@ def get_keys(
 
 
 @router.get(
-    "/{key_id}",
+    "/{keyId}",
     response_model=ApiKeyResponse,
     status_code=status.HTTP_200_OK,
     summary="API 키 단일 조회",
@@ -71,7 +71,7 @@ def get_key(
 
 
 @router.put(
-    "/{key_id}/activate",
+    "/{keyId}/activate",
     response_model=ApiKeyResponse,
     status_code=status.HTTP_200_OK,
     summary="API 키 활성화",
@@ -87,7 +87,7 @@ def activate_key(
 
 
 @router.put(
-    "/{key_id}/deactivate",
+    "/{keyId}/deactivate",
     response_model=ApiKeyResponse,
     status_code=status.HTTP_200_OK,
     summary="API 키 비활성화",
@@ -103,7 +103,7 @@ def deactivate_key(
 
 
 @router.delete(
-    "/{key_id}",
+    "/{keyId}",
     response_model=ApiKeyResponse,
     status_code=status.HTTP_200_OK,
     summary="API 키 삭제",

@@ -24,9 +24,8 @@ services:
         ports:
             - "3306:3306"
         volumes:
-            - db_data:/var/lib/mysql
+            - scratcha_volume_local:/var/lib/mysql
             - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
-        command: --default-time-zone=+00:00 # 이 줄을 추가합니다.
         healthcheck:
             test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD"]
             timeout: 20s
@@ -54,4 +53,4 @@ services:
 
 # Docker 볼륨 정의
 volumes:
-    db_data:
+    scratcha_volume_local:

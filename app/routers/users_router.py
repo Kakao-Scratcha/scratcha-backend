@@ -73,13 +73,6 @@ def update_user(
 
 ):
     updatedUser = userService.update_user(currnetUser.id, userUpdate)
-
-    if not updatedUser:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="사용자를 찾을 수 없습니다."
-        )
-
     return updatedUser
 
 
@@ -122,7 +115,7 @@ def admin_get_all_users(
 
 
 @router.get(
-    "/admin/{user_id}",
+    "/admin/{userId}",
     response_model=UserResponse,
     summary="[관리자] 특정 사용자 조회",
     description="관리자 권한으로 특정 사용자 계정 정보를 조회합니다 (소프트 삭제된 사용자 포함 여부 선택 가능).",
@@ -141,7 +134,7 @@ def admin_get_user_by_id(
 
 
 @router.post(
-    "/admin/{user_id}/restore",
+    "/admin/{userId}/restore",
     response_model=UserResponse,
     summary="[관리자] 특정 사용자 계정 복구",
     description="관리자 권한으로 소프트 삭제된 사용자 계정을 복구합니다.",
@@ -161,7 +154,7 @@ def admin_restore_user(
 
 
 @router.delete(
-    "/admin/{user_id}",
+    "/admin/{userId}",
     response_model=UserResponse,
     summary="[관리자] 특정 사용자 계정 소프트 삭제",
     description="관리자 권한으로 특정 사용자 계정을 소프트 삭제합니다.",
