@@ -73,13 +73,6 @@ def update_user(
 
 ):
     updatedUser = userService.update_user(currnetUser.id, userUpdate)
-
-    if not updatedUser:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="사용자를 찾을 수 없습니다."
-        )
-
     return updatedUser
 
 

@@ -42,14 +42,10 @@ class UserRepository:
 
     # 사용자 정보 업데이트 CURD
 
-    def update_user(self, dbUser: User, user_update: UserUpdate) -> User:
+    def update_user(self, dbUser: User, userUpdate: UserUpdate) -> User:
         """
         User 객체의 정보를 UserUpdate 스키마에 따라 업데이트합니다.
         """
-        update_data = user_update.model_dump(exclude_unset=True)  # Pydantic v2
-
-        for key, value in update_data.items():
-            setattr(dbUser, key, value)
 
         self.db.add(dbUser)  # 변경 감지 및 스테이징
         self.db.commit()     # DB에 변경 사항 반영

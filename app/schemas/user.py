@@ -3,6 +3,8 @@
 from datetime import datetime
 from typing import Optional, Annotated
 from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
+from pydantic.fields import FieldInfo
+
 from pydantic.alias_generators import to_camel
 
 from ..models.user import UserRole, UserSubscription
@@ -51,15 +53,33 @@ class UserLogin(BaseModel):  # 사용자 로그인 스키마
 
 
 class UserUpdate(BaseModel):  # 사용자 업데이트 스키마
-    userName: Optional[Annotated[str, StringConstraints(
-        min_length=1, max_length=30, pattern=r"^[가-힣a-zA-Z0-9]+$")]] = None  # 사용자 이름
-
-    @field_validator('userName')
-    @classmethod
-    def validate_username_not_only_digits(cls, v):
-        if v is not None and v.isdigit():
-            raise ValueError('Username cannot consist only of digits')
-        return v
+    userName: Optional[str] = Field(
+        None,
+        examples=["홍길동"],
+        min_length=1,
+        max_length=30
+    )
+    currnetPassword: Optional[str] = Field(
+        None,
+        title="현재 비밀번호",
+        examples=["password123!@#"],
+        min_length=8,
+        max_length=20
+    )
+    newPassword: Optional[str] = Field(
+        None,
+        title="새 비밀번호",
+        examples=["newpassword123!@#"],
+        min_length=8,
+        max_length=20
+    )
+    confirmPassword: Optional[str] = Field(
+        None,
+        title="새 비밀번호 확인",
+        examples=["newpassword123!@#"],
+        min_length=8,
+        max_length=20
+    )
 
 
 class UserResponse(BaseModel):
