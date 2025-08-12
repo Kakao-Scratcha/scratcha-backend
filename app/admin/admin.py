@@ -25,7 +25,10 @@ class UserAdmin(ModelView, model=User):
         User.email,
         User.passwordHash,
         User.role,
+        User.subscribe,
+        User.token,
         User.createdAt,
+        User.updatedAt,
         User.deletedAt,
     )
 
@@ -34,19 +37,31 @@ class UserAdmin(ModelView, model=User):
         User.email,
         User.passwordHash,
         User.role,
+        User.subscribe,
+        User.token,
         User.createdAt,
+        User.updatedAt,
         User.deletedAt,
     )
     column_default_sort = (User.id, False)
 
-    column_searchable_list = (User.email, User.role)
+    column_searchable_list = (
+        User.id,
+        User.email,
+        User.passwordHash,
+        User.role,
+        User.subscribe,
+    )
 
     column_labels = {
         User.id: "ID",
         User.email: "Email",
         User.passwordHash: "Password Hash",
         User.role: "Role",
+        User.subscribe: "Subscribe",
+        User.token: "Token",
         User.createdAt: "Created At",
+        User.updatedAt: "Updated At",
         User.deletedAt: "Deleted At",
     }
 
@@ -75,6 +90,7 @@ class ApplicationAdmin(ModelView, model=Application):
         Application.appName,
         Application.user,
         Application.createdAt,
+        Application.updatedAt,
         Application.deletedAt,
     ]
     column_sortable_list = [
@@ -82,13 +98,15 @@ class ApplicationAdmin(ModelView, model=Application):
         Application.user,
         Application.appName,
         Application.createdAt,
+        Application.updatedAt,
         Application.deletedAt,
     ]
     column_default_sort = (Application.id, False)
 
     column_searchable_list = [
+        Application.id,
         Application.appName,
-        Application.user
+        Application.user,
     ]
 
     column_labels = {
@@ -96,6 +114,7 @@ class ApplicationAdmin(ModelView, model=Application):
         Application.appName: "App Name",
         Application.user: "User Email",
         Application.createdAt: "Created At",
+        Application.updatedAt: "Updated At",
         Application.deletedAt: "Deleted At",
     }
     column_formatters = {
@@ -128,6 +147,7 @@ class AppApiKeyAdmin(ModelView, model=AppApiKey):
         AppApiKey.key,
         AppApiKey.isActive,
         AppApiKey.createdAt,
+        AppApiKey.updatedAt,
         AppApiKey.expiresAt,
     ]
     column_sortable_list = [
@@ -136,6 +156,7 @@ class AppApiKeyAdmin(ModelView, model=AppApiKey):
         AppApiKey.key,
         AppApiKey.isActive,
         AppApiKey.createdAt,
+        AppApiKey.updatedAt,
         AppApiKey.expiresAt,
     ]
     column_default_sort = (AppApiKey.id, False)
@@ -146,11 +167,12 @@ class AppApiKeyAdmin(ModelView, model=AppApiKey):
     ]
 
     column_labels = {
-        AppApiKey.id: "Api Key ID",
+        AppApiKey.id: "Key ID",
         AppApiKey.appId: "App ID",
         AppApiKey.key: "API Key",
         AppApiKey.isActive: "Active",
         AppApiKey.createdAt: "Created At",
+        AppApiKey.updatedAt: "Updated At",
         AppApiKey.expiresAt: "Expires At",
     }
     page_size = 50
