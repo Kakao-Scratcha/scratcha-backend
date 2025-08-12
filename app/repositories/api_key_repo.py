@@ -22,7 +22,7 @@ class AppApiKeyRepository:
         if existingKey:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="[api_key_repo] 이미 해당 애플리케이션에 대한 API 키가 존재합니다."
+                detail="이미 해당 애플리케이션에 대한 API 키가 존재합니다."
             )
 
         # 2. API 키를 생성합니다.
@@ -50,7 +50,7 @@ class AppApiKeyRepository:
             self.db.rollback()  # 오류 발생 시 롤백합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="[api_key_repo] API 키 생성 중 오류가 발생했습니다."
+                detail="API 키 생성 중 오류가 발생했습니다."
             )
 
         # 6. 새로 생성된 API 키 객체를 반환합니다.
@@ -88,11 +88,6 @@ class AppApiKeyRepository:
         """API 키를 소프트 삭제합니다."""
 
         key = self.get_key_by_key_id(keyId)
-        if not key:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="[api_key_repo] API 키를 찾을 수 없습니다."
-            )
 
         key.deletedAt = datetime.now()
         key.isActive = False  # 비활성화 상태로 변경
@@ -104,7 +99,7 @@ class AppApiKeyRepository:
             self.db.rollback()  # 오류 발생 시 롤백합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="[api_key_repo] API 키 삭제 중 오류가 발생했습니다."
+                detail="API 키 삭제 중 오류가 발생했습니다."
             )
 
         self.db.refresh(key)
@@ -115,12 +110,6 @@ class AppApiKeyRepository:
         """API 키를 활성화합니다."""
 
         key = self.get_key_by_key_id(keyId)
-        if not key:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="[api_key_repo] API 키를 찾을 수 없습니다."
-            )
-
         key.isActive = True
 
         try:
@@ -130,7 +119,7 @@ class AppApiKeyRepository:
             self.db.rollback()  # 오류 발생 시 롤백합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="[api_key_repo] API 키 활성화 중 오류가 발생했습니다."
+                detail="API 키 활성화 중 오류가 발생했습니다."
             )
 
         self.db.refresh(key)
@@ -141,12 +130,6 @@ class AppApiKeyRepository:
         """API 키를 비활성화합니다."""
 
         key = self.get_key_by_key_id(keyId)
-        if not key:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="[api_key_repo] API 키를 찾을 수 없습니다."
-            )
-
         key.isActive = False
 
         try:
@@ -156,7 +139,7 @@ class AppApiKeyRepository:
             self.db.rollback()  # 오류 발생 시 롤백합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="[api_key_repo] API 키 비활성화 중 오류가 발생했습니다."
+                detail="API 키 비활성화 중 오류가 발생했습니다."
             )
 
         self.db.refresh(key)

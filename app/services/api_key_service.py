@@ -21,7 +21,7 @@ class ApiKeyService:
         if existingKey:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="[api_key_service] 이미 해당 애플리케이션에 대한 API 키가 존재합니다."
+                detail="이미 해당 애플리케이션에 대한 API 키가 존재합니다."
             )
 
         # 2. API 키를 생성합니다.
@@ -40,11 +40,11 @@ class ApiKeyService:
         keys = self.apiKeyRepo.get_keys_by_user_id(currentUser.id)
 
         # 2. API 키가 없는 경우 예외 처리
-        if not keys:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="[api_key_service] API 키를 찾을 수 없습니다."
-            )
+        # if not keys:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_404_NOT_FOUND,
+        #         detail="API 키를 찾을 수 없습니다."
+        #     )
 
         return keys
 
@@ -58,7 +58,7 @@ class ApiKeyService:
         if not key or key.userId != currentUser.id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="[api_key_service] API 키를 찾을 수 없습니다."
+                detail="API 키를 찾을 수 없습니다."
             )
 
         return key
@@ -73,7 +73,7 @@ class ApiKeyService:
         if not key or key.userId != currentUser.id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="[api_key_service] API 키를 찾을 수 없습니다."
+                detail="API 키를 찾을 수 없습니다."
             )
 
         # 3. API 키를 삭제합니다.
@@ -91,7 +91,7 @@ class ApiKeyService:
         if not key:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="[api_key_service] API 키를 찾을 수 없습니다."
+                detail="API 키를 찾을 수 없습니다."
             )
 
         # 3. API 키를 활성화합니다.
@@ -107,7 +107,7 @@ class ApiKeyService:
         if not key:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="[api_key_service] API 키를 찾을 수 없습니다."
+                detail="API 키를 찾을 수 없습니다."
             )
 
         # 3. API 키를 비활성화합니다.

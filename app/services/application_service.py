@@ -60,7 +60,7 @@ class ApplicationService:
         if maxApps is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="[app_service] 유효하지 않은 구독 상태입니다."
+                detail="유효하지 않은 구독 상태입니다."
             )
 
         # 2. 사용자의 애플리케이션 개수를 조회
@@ -71,7 +71,7 @@ class ApplicationService:
         if maxApps != -1 and currentAppsCount >= maxApps:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"[app_service] 현재 구독 플랜({currentUser.subscribe.value})로는 최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
+                detail=f"현재 구독 플랜({currentUser.subscribe.value})로는 최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
             )
 
         # 4. 애플리케이션을 생성합니다.
@@ -93,12 +93,12 @@ class ApplicationService:
         apps = self.appRepo.get_applications_by_user_id(currentUser.id)
         keys = self.apiKeyRepo.get_keys_by_user_id(currentUser.id)
 
-        # 2. 사용자의 애플리케이션이 없는 경우 예외 처리
-        if not apps:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="[app_service] 사용자의 애플리케이션을 찾을 수 없습니다."
-            )
+        # 2. 사용자의 애플리케이션이 없는 경우 예외 처리 -> 빈배열 반환으로 수정 (2025.08.11)
+        # if not apps:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_404_NOT_FOUND,
+        #         detail="사용자의 애플리케이션을 찾을 수 없습니다."
+        #     )
 
         return [
             self.map_to_application_response(app, next(
@@ -117,12 +117,12 @@ class ApplicationService:
         if not app or app.userId != currentUser.id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="[app_service] 애플리케이션을 찾을 수 없습니다."
+                detail="애플리케이션을 찾을 수 없습니다."
             )
 
         return self.map_to_application_response(app, key)
 
-    def update_application(self, appId: str, currentUser: User, appUpdate: ApplicationUpdate) -> ApplicationResponse:
+    def update_application(self, appId: int, currentUser: User, appUpdate: ApplicationUpdate) -> ApplicationResponse:
         """애플리케이션 정보를 업데이트합니다."""
 
         # 1. 애플리케이션을 조회합니다.
@@ -133,7 +133,7 @@ class ApplicationService:
         if not app or app.userId != currentUser.id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="[app_service] 애플리케이션을 찾을 수 없습니다."
+                detail="애플리케이션을 찾을 수 없습니다."
             )
 
         # 3. 애플리케이션 정보를 업데이트합니다.
@@ -141,7 +141,7 @@ class ApplicationService:
 
         return self.map_to_application_response(updatedApp, key)
 
-    def delete_application(self, appId: str, currentUser: User) -> ApplicationResponse:
+    def delete_application(self, appId: int, currentUser: User) -> ApplicationResponse:
         """애플리케이션을 소프트 삭제하고 연결된 API 키를 비활성화합니다."""
 
         # 1. 애플리케이션을 조회합니다.
@@ -152,7 +152,7 @@ class ApplicationService:
         if not app or app.userId != currentUser.id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="[app_service] 애플리케이션을 찾을 수 없습니다."
+                detail="애플리케이션을 찾을 수 없습니다."
             )
 
         # 3. 애플리케이션을 소프트 삭제합니다.
