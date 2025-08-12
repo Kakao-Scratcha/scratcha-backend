@@ -14,7 +14,7 @@ class ApplicationRepository:
         self.db = db
 
     #  애플리케이션 생성 CRUD
-    def create_application(self, userId: str,  appCreate: ApplicationCreate) -> Application:
+    def create_application(self, userId: int,  appCreate: ApplicationCreate) -> Application:
         """새로운 애플리케이션을 생성합니다."""
 
         # 1. 애플리케이션 객체를 생성합니다.
@@ -32,7 +32,7 @@ class ApplicationRepository:
             self.db.rollback()  # 오류 발생 시 롤백합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="[app_repo] 애플리케이션 생성 중 오류가 발생했습니다."
+                detail="애플리케이션 생성 중 오류가 발생했습니다."
             )
 
         # 3. 새로 생성된 애플리케이션 객체를 반환합니다.
@@ -43,7 +43,7 @@ class ApplicationRepository:
         return app
 
     # 애플리케이션 조회 CRUD
-    def get_applications_by_user_id(self, userId: str) -> List[Application]:
+    def get_applications_by_user_id(self, userId: int) -> List[Application]:
         """사용자의 모든 애플리케이션을 조회합니다."""
 
         return self.db.query(Application).filter(
@@ -52,7 +52,7 @@ class ApplicationRepository:
         ).all()
 
     # 애플리케이션 갯수 조회 CRUD
-    def get_applications_count_by_user_id(self, userId: str) -> int:
+    def get_applications_count_by_user_id(self, userId: int) -> int:
         """사용자의 애플리케이션 개수를 조회합니다."""
 
         return self.db.query(Application).filter(
@@ -61,7 +61,7 @@ class ApplicationRepository:
         ).count()
 
     # 애플리케이션 단일 조회 CRUD
-    def get_application_by_app_id(self, appId: str) -> Application:
+    def get_application_by_app_id(self, appId: int) -> Application:
         """애플리케이션 ID로 단일 애플리케이션을 조회합니다."""
 
         return self.db.query(Application).filter(
@@ -85,7 +85,7 @@ class ApplicationRepository:
             self.db.rollback()  # 오류 발생 시 롤백합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="[app_repo] 애플리케이션 업데이트 중 오류가 발생했습니다."
+                detail="애플리케이션 업데이트 중 오류가 발생했습니다."
             )
 
         # 3. 최신 데이터를 가져옵니다.
@@ -98,11 +98,7 @@ class ApplicationRepository:
         """애플리케이션을 소프트 삭제합니다."""
 
         app = self.get_application_by_app_id(appId)
-        if not app:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="[app_repo] 애플리케이션을 찾을 수 없습니다."
-            )
+
         # 1. 애플리케이션의 삭제 시간을 현재 시간으로 설정합니다.
         app.deletedAt = datetime.now()
 
@@ -114,7 +110,7 @@ class ApplicationRepository:
             self.db.rollback()  # 오류 발생 시 롤백합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="[app_repo] 애플리케이션 삭제 중 오류가 발생했습니다."
+                detail="애플리케이션 삭제 중 오류가 발생했습니다."
             )
 
         # 3. 최신 데이터를 가져옵니다.
