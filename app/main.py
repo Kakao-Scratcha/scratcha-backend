@@ -6,7 +6,7 @@ from db.session import engine
 from sqladmin import Admin
 
 from .routers import users_router, auth_router, application_router, api_key_router
-from .admin.admin import UserAdmin, ApplicationAdmin, AppApiKeyAdmin
+from .admin.admin import UserAdmin, ApplicationAdmin, ApiKeyAdmin
 from .admin.auth import AdminAuth
 
 
@@ -41,7 +41,7 @@ authentication_backend = AdminAuth(secret_key="...")
 admin = Admin(app, engine, authentication_backend=authentication_backend)
 admin.add_view(UserAdmin)
 admin.add_view(ApplicationAdmin)
-admin.add_view(AppApiKeyAdmin)
+admin.add_view(ApiKeyAdmin)
 
 
 @app.get("/")

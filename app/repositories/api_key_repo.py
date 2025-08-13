@@ -7,14 +7,14 @@ from sqlalchemy import and_
 from datetime import datetime, timedelta
 import secrets
 
-from ..models.api_key import AppApiKey
+from ..models.api_key import ApiKey
 
 
-class AppApiKeyRepository:
+class ApiKeyRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_key(self, userId: int, appId: int, expiresPolicy: int = 0) -> AppApiKey:
+    def create_key(self, userId: int, appId: int, expiresPolicy: int = 0) -> ApiKey:
         """특정 애플리케이션에 대한 API 키를 생성합니다."""
 
         # 1. API 키가 이미 존재하는지 확인합니다.
@@ -35,7 +35,7 @@ class AppApiKeyRepository:
             expiresAt = datetime.now() + timedelta(days=expiresPolicy)
 
         # 4. API 키 객체를 생성합니다.
-        key = AppApiKey(
+        key = ApiKey(
             userId=userId,
             appId=appId,
             key=key,
@@ -60,31 +60,31 @@ class AppApiKeyRepository:
 
         return key
 
-    def get_keys_by_user_id(self, userId) -> List[AppApiKey]:
+    def get_keys_by_user_id(self, userId) -> List[ApiKey]:
         """유저의 모든 API 키를 조회합니다."""
 
-        return self.db.query(AppApiKey).filter(
-            AppApiKey.userId == userId,
-            AppApiKey.deletedAt.is_(None)
+        return self.db.query(ApiKey).filter(
+            ApiKey.userId == userId,
+            ApiKey.deletedAt.is_(None)
         ).all()
 
-    def get_key_by_app_id(self, appId: int) -> AppApiKey:
+    def get_key_by_app_id(self, appId: int) -> ApiKey:
         """특정 애플리케이션에 대한 API 키를 조회합니다."""
 
-        return self.db.query(AppApiKey).filter(
-            AppApiKey.appId == appId,
-            AppApiKey.deletedAt.is_(None)
+        return self.db.query(ApiKey).filter(
+            ApiKey.appId == appId,
+            ApiKey.deletedAt.is_(None)
         ).first()
 
-    def get_key_by_key_id(self, keyId: int) -> AppApiKey:
+    def get_key_by_key_id(self, keyId: int) -> ApiKey:
         """API 키 ID로 단일 API 키를 조회합니다."""
 
-        return self.db.query(AppApiKey).filter(
-            AppApiKey.id == keyId,
-            AppApiKey.deletedAt.is_(None)
+        return self.db.query(ApiKey).filter(
+            ApiKey.id == keyId,
+            ApiKey.deletedAt.is_(None)
         ).first()
 
-    def delete_key(self, keyId: int) -> AppApiKey:
+    def delete_key(self, keyId: int) -> ApiKey:
         """API 키를 소프트 삭제합니다."""
 
         key = self.get_key_by_key_id(keyId)
@@ -106,7 +106,7 @@ class AppApiKeyRepository:
 
         return key
 
-    def activate_key(self, keyId: int) -> AppApiKey:
+    def activate_key(self, keyId: int) -> ApiKey:
         """API 키를 활성화합니다."""
 
         key = self.get_key_by_key_id(keyId)
@@ -126,7 +126,7 @@ class AppApiKeyRepository:
 
         return key
 
-    def deactivate_key(self, keyId: int) -> AppApiKey:
+    def deactivate_key(self, keyId: int) -> ApiKey:
         """API 키를 비활성화합니다."""
 
         key = self.get_key_by_key_id(keyId)

@@ -87,7 +87,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     userName: str
     role: UserRole
-    subscribe: UserSubscription
+    plan: UserSubscription
     token: int
     createdAt: datetime
     updatedAt: datetime

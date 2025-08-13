@@ -5,9 +5,9 @@ from fastapi import HTTPException, status
 from typing import List
 
 from ..models.user import User
-from ..models.api_key import AppApiKey
+from ..models.api_key import ApiKey
 from ..models.application import Application
-from ..repositories.api_key_repo import AppApiKeyRepository
+from ..repositories.api_key_repo import ApiKeyRepository
 from ..repositories.application_repo import ApplicationRepository
 from ..schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
 from ..schemas.api_key import ApiKeyResponse
@@ -27,9 +27,9 @@ class ApplicationService:
         # 데이터베이스 세션을 직접 참조하고, 리포지토리 인스턴스를 생성합니다.
         self.db = db
         self.appRepo = ApplicationRepository(db)
-        self.apiKeyRepo = AppApiKeyRepository(db)
+        self.apiKeyRepo = ApiKeyRepository(db)
 
-    def map_to_application_response(self, app: Application, key: AppApiKey) -> ApplicationResponse:
+    def map_to_application_response(self, app: Application, key: ApiKey) -> ApplicationResponse:
         """애플리케이션과 API 키 정보를 ApplicationResponse로 매핑합니다."""
 
         return ApplicationResponse(
@@ -55,7 +55,7 @@ class ApplicationService:
         """애플리케이션과 API 키를 생성합니다."""
 
         # 1. 사용자가 구독한 요금제를 확인.
-        maxApps = MAX_APPLICATIONS_PER_USER.get(currentUser.subscribe.value)
+        maxApps = MAX_APPLICATIONS_PER_USER.get(currentUser.plan.value)
 
         if maxApps is None:
             raise HTTPException(
@@ -71,7 +71,7 @@ class ApplicationService:
         if maxApps != -1 and currentAppsCount >= maxApps:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"현재 구독 플랜({currentUser.subscribe.value})로는 최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
+                detail=f"현재 구독 플랜({currentUser.plan.value})로는 최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
             )
 
         # 4. 애플리케이션을 생성합니다.

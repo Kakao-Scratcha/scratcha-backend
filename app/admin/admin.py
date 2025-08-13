@@ -4,7 +4,7 @@ from starlette.requests import Request
 
 from ..models.user import User
 from ..models.application import Application
-from ..models.api_key import AppApiKey
+from ..models.api_key import ApiKey
 from ..core.security import get_password_hash
 
 
@@ -25,7 +25,7 @@ class UserAdmin(ModelView, model=User):
         User.email,
         User.passwordHash,
         User.role,
-        User.subscribe,
+        User.plan,
         User.token,
         User.createdAt,
         User.updatedAt,
@@ -37,7 +37,7 @@ class UserAdmin(ModelView, model=User):
         User.email,
         User.passwordHash,
         User.role,
-        User.subscribe,
+        User.plan,
         User.token,
         User.createdAt,
         User.updatedAt,
@@ -50,7 +50,7 @@ class UserAdmin(ModelView, model=User):
         User.email,
         User.passwordHash,
         User.role,
-        User.subscribe,
+        User.plan,
     )
 
     column_labels = {
@@ -58,7 +58,7 @@ class UserAdmin(ModelView, model=User):
         User.email: "Email",
         User.passwordHash: "Password Hash",
         User.role: "Role",
-        User.subscribe: "Subscribe",
+        User.plan: "plan",
         User.token: "Token",
         User.createdAt: "Created At",
         User.updatedAt: "Updated At",
@@ -134,7 +134,7 @@ class ApplicationAdmin(ModelView, model=Application):
         return await super().update_model(request, pk, data)
 
 
-class AppApiKeyAdmin(ModelView, model=AppApiKey):
+class ApiKeyAdmin(ModelView, model=ApiKey):
     def is_accessible(self, request: Request) -> bool:
         return True
 
@@ -142,37 +142,37 @@ class AppApiKeyAdmin(ModelView, model=AppApiKey):
         return True
 
     column_list = [
-        AppApiKey.id,
-        AppApiKey.appId,
-        AppApiKey.key,
-        AppApiKey.isActive,
-        AppApiKey.createdAt,
-        AppApiKey.updatedAt,
-        AppApiKey.expiresAt,
+        ApiKey.id,
+        ApiKey.appId,
+        ApiKey.key,
+        ApiKey.isActive,
+        ApiKey.createdAt,
+        ApiKey.updatedAt,
+        ApiKey.expiresAt,
     ]
     column_sortable_list = [
-        AppApiKey.id,
-        AppApiKey.appId,
-        AppApiKey.key,
-        AppApiKey.isActive,
-        AppApiKey.createdAt,
-        AppApiKey.updatedAt,
-        AppApiKey.expiresAt,
+        ApiKey.id,
+        ApiKey.appId,
+        ApiKey.key,
+        ApiKey.isActive,
+        ApiKey.createdAt,
+        ApiKey.updatedAt,
+        ApiKey.expiresAt,
     ]
-    column_default_sort = (AppApiKey.id, False)
+    column_default_sort = (ApiKey.id, False)
 
     column_searchable_list = [
-        AppApiKey.appId,
-        AppApiKey.userId
+        ApiKey.appId,
+        ApiKey.userId
     ]
 
     column_labels = {
-        AppApiKey.id: "Key ID",
-        AppApiKey.appId: "App ID",
-        AppApiKey.key: "API Key",
-        AppApiKey.isActive: "Active",
-        AppApiKey.createdAt: "Created At",
-        AppApiKey.updatedAt: "Updated At",
-        AppApiKey.expiresAt: "Expires At",
+        ApiKey.id: "Key ID",
+        ApiKey.appId: "App ID",
+        ApiKey.key: "API Key",
+        ApiKey.isActive: "Active",
+        ApiKey.createdAt: "Created At",
+        ApiKey.updatedAt: "Updated At",
+        ApiKey.expiresAt: "Expires At",
     }
     page_size = 50

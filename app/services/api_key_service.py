@@ -2,8 +2,8 @@ from typing import List
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..repositories.api_key_repo import AppApiKeyRepository
-from ..models.api_key import AppApiKey
+from ..repositories.api_key_repo import ApiKeyRepository
+from ..models.api_key import ApiKey
 from ..models.user import User
 from ..schemas.api_key import ApiKeyResponse
 
@@ -11,9 +11,9 @@ from ..schemas.api_key import ApiKeyResponse
 class ApiKeyService:
     def __init__(self, db: Session):
         self.db = db
-        self.apiKeyRepo = AppApiKeyRepository(db)
+        self.apiKeyRepo = ApiKeyRepository(db)
 
-    def create_key(self, currentUser: User, appId: int, expiresPolicy: int = 0) -> AppApiKey:
+    def create_key(self, currentUser: User, appId: int, expiresPolicy: int = 0) -> ApiKey:
         """특정 애플리케이션에 대한 API 키를 생성합니다."""
 
         # 1. API 키가 이미 존재하는지 확인합니다.
@@ -25,7 +25,7 @@ class ApiKeyService:
             )
 
         # 2. API 키를 생성합니다.
-        key: AppApiKey = self.apiKeyRepo.create_key(
+        key: ApiKey = self.apiKeyRepo.create_key(
             userId=currentUser.id,
             appId=appId,
             expiresPolicy=expiresPolicy
@@ -81,7 +81,7 @@ class ApiKeyService:
 
         return key
 
-    def activate_key(self, keyId: int) -> AppApiKey:
+    def activate_key(self, keyId: int) -> ApiKey:
         """API 키를 활성화합니다."""
 
         # 1. API 키를 조회합니다.
@@ -97,7 +97,7 @@ class ApiKeyService:
         # 3. API 키를 활성화합니다.
         return self.apiKeyRepo.activate_key(keyId)
 
-    def deactivate_key(self, keyId: int) -> AppApiKey:
+    def deactivate_key(self, keyId: int) -> ApiKey:
         """API 키를 비활성화합니다."""
 
         # 1. API 키를 조회합니다.
