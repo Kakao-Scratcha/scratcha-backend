@@ -1,6 +1,6 @@
 # repositories/api_key_repo.py
 
-from typing import List
+from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -42,21 +42,18 @@ class ApiKeyRepository:
             isActive=True,
             expiresAt=expiresAt
         )
-        # 5. 데이터베이스에 API 키를 추가합니다.
+
+        # 5. 데이터베이스에 API 키를 추가하고 커밋합니다.
         try:
             self.db.add(key)
-            self.db.flush()  # 데이터베이스에 추가한 후, id를 할당받기 위해 flush합니다.
-        except Exception as e:
+            self.db.commit()
+            self.db.refresh(key)
+        except Exception:
             self.db.rollback()  # 오류 발생 시 롤백합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="API 키 생성 중 오류가 발생했습니다."
             )
-
-        # 6. 새로 생성된 API 키 객체를 반환합니다.
-        self.db.add(key)  # 데이터베이스에 추가합니다.
-        self.db.commit()
-        self.db.refresh(key)  # 최신 데이터를 가져옵니다.
 
         return key
 
@@ -68,7 +65,7 @@ class ApiKeyRepository:
             ApiKey.deletedAt.is_(None)
         ).all()
 
-    def get_key_by_app_id(self, appId: int) -> ApiKey:
+    def get_key_by_app_id(self, appId: int) -> Optional[ApiKey]:
         """특정 애플리케이션에 대한 API 키를 조회합니다."""
 
         return self.db.query(ApiKey).filter(
@@ -76,7 +73,7 @@ class ApiKeyRepository:
             ApiKey.deletedAt.is_(None)
         ).first()
 
-    def get_key_by_key_id(self, keyId: int) -> ApiKey:
+    def get_key_by_key_id(self, keyId: int) -> Optional[ApiKey]:
         """API 키 ID로 단일 API 키를 조회합니다."""
 
         return self.db.query(ApiKey).filter(
@@ -84,64 +81,78 @@ class ApiKeyRepository:
             ApiKey.deletedAt.is_(None)
         ).first()
 
-    def delete_key(self, keyId: int) -> ApiKey:
+    def delete_key(self, keyId: int) -> Optional[ApiKey]:
         """API 키를 소프트 삭제합니다."""
 
         key = self.get_key_by_key_id(keyId)
+        if not key:
+            return None
 
         key.deletedAt = datetime.now()
-        key.isActive = False  # 비활성화 상태로 변경
+        key.isActive = False
 
         try:
             self.db.add(key)
-            self.db.commit()  # 변경 사항을 커밋합니다.
+            self.db.commit()
+            self.db.refresh(key)
         except Exception:
-            self.db.rollback()  # 오류 발생 시 롤백합니다.
+            self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="API 키 삭제 중 오류가 발생했습니다."
             )
 
-        self.db.refresh(key)
-
         return key
 
-    def activate_key(self, keyId: int) -> ApiKey:
+    def activate_key(self, keyId: int) -> Optional[ApiKey]:
         """API 키를 활성화합니다."""
 
         key = self.get_key_by_key_id(keyId)
+        if not key:
+            return None
         key.isActive = True
 
         try:
             self.db.add(key)
-            self.db.commit()  # 변경 사항을 커밋합니다.
+            self.db.commit()
+            self.db.refresh(key)
         except Exception:
-            self.db.rollback()  # 오류 발생 시 롤백합니다.
+            self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="API 키 활성화 중 오류가 발생했습니다."
             )
 
-        self.db.refresh(key)
-
         return key
 
-    def deactivate_key(self, keyId: int) -> ApiKey:
+    def deactivate_key(self, keyId: int) -> Optional[ApiKey]:
         """API 키를 비활성화합니다."""
 
         key = self.get_key_by_key_id(keyId)
+        if not key:
+            return None
         key.isActive = False
 
         try:
             self.db.add(key)
-            self.db.commit()  # 변경 사항을 커밋합니다.
+            self.db.commit()
+            self.db.refresh(key)
         except Exception:
-            self.db.rollback()  # 오류 발생 시 롤백합니다.
+            self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="API 키 비활성화 중 오류가 발생했습니다."
             )
 
-        self.db.refresh(key)
-
         return key
+
+    def get_active_api_key_by_target_key(self, targetKey: str) -> Optional[ApiKey]:
+        """해당 키가 DB에 저장되어있는지 조회하고 유효한 키인지 검증합니다."""
+
+        return self.db.query(ApiKey).filter(
+            and_(
+                ApiKey.key == targetKey,
+                ApiKey.isActive == True,
+                ApiKey.deletedAt.is_(None)
+            )
+        ).first()

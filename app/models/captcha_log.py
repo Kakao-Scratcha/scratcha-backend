@@ -1,3 +1,5 @@
+# backend/models/captcha_log.py
+
 from sqlalchemy import Column, Enum, Integer, String, TEXT, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 import enum

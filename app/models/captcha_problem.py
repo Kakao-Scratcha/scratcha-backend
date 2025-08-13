@@ -1,3 +1,5 @@
+# backend/models/captcha_problem.py
+
 from sqlalchemy import Column, Integer, String, TEXT, DateTime, func
 from sqlalchemy.orm import relationship
 
