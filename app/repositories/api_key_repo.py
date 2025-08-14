@@ -1,4 +1,4 @@
-# repositories/api_key_repo.py
+# app/repositories/api_key_repo.py
 
 from typing import List, Optional
 from fastapi import HTTPException, status
@@ -9,7 +9,7 @@ import secrets
 
 from app.models.application import Application
 
-from ..models.api_key import ApiKey
+from app.models.api_key import ApiKey
 
 
 class ApiKeyRepository:

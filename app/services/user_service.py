@@ -2,17 +2,15 @@
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-from typing import Optional, List
+from typing import List
 import re
 
 from app.core.security import get_password_hash, verify_password
-from ..models.user import User
-from ..repositories.user_repo import UserRepository
-from ..schemas.user import UserCreate, UserUpdate
+from app.models.user import User
+from app.repositories.user_repo import UserRepository
+from app.schemas.user import UserCreate, UserUpdate
 
 
-pwdContext = CryptContext(schemes=["bcrypt"], deprecated="auto")
 USER_NAME_PATTERN = re.compile(r"^[가-힣a-zA-Z0-9]+$")
 
 
@@ -20,9 +18,6 @@ class UserService:
 
     def __init__(self, db: Session):
         self.userRepo = UserRepository(db)
-
-    def get_password_hash(self, password: str) -> str:
-        return pwdContext.hash(password)
 
     def get_user_by_id(self, userId: str) -> User:
         return self.userRepo.get_user_by_id(userId)
@@ -39,7 +34,7 @@ class UserService:
             # 이메일이 이미 존재하면 (소프트 삭제 상태 포함) None 반환하여 중복 알림
             return None
 
-        hashedPassword = self.get_password_hash(userData.password)
+        hashedPassword = get_password_hash(userData.password)
         newUser = self.userRepo.create_user(userData, hashedPassword)
 
         return newUser

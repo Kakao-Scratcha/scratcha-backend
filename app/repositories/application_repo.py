@@ -1,12 +1,12 @@
-# repositories/application_repo.py
+# app/repositories/application_repo.py
 
 from datetime import datetime
 from typing import List
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..models.application import Application
-from ..schemas.application import ApplicationCreate, ApplicationUpdate
+from app.models.application import Application
+from app.schemas.application import ApplicationCreate, ApplicationUpdate
 
 
 class ApplicationRepository:

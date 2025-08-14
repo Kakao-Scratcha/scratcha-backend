@@ -1,12 +1,11 @@
-# backend/repositories/user_repo.py
+# app/repositories/user_repo.py
 
 from typing import List
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
-from ..models.user import User
-from ..schemas.user import UserCreate, UserUpdate
+from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
 
 
 class UserRepository:

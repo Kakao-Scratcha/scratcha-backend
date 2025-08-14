@@ -7,7 +7,7 @@ from pydantic.fields import FieldInfo
 
 from pydantic.alias_generators import to_camel
 
-from ..models.user import UserRole, UserSubscription
+from app.models.user import UserRole, UserSubscription
 
 
 class UserCreate(BaseModel):  # 사용자 회원가입 스키마
@@ -94,6 +94,6 @@ class UserResponse(BaseModel):
     deletedAt: Optional[datetime]  # 소프트 딜리트
 
     class Config:
-        from_attribution = True  # Pydantic v2: orm_mode 대신 from_attributes 사용
+        from_attributes = True  # Pydantic v2: orm_mode 대신 from_attributes 사용
         alias_generator = to_camel  # 카멜케이스 유지
         populate_by_name = True

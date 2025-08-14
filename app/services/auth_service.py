@@ -4,11 +4,10 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import Optional
 
-from ..core import security  # security 모듈 임포트
-from ..models.user import User  # User 모델 임포트
-from ..repositories.user_repo import UserRepository  # UserRepository 임포트
-from ..schemas.user import UserLogin
-from ..schemas.token import Token
+from app.core import security
+from app.models.user import User
+from app.repositories.user_repo import UserRepository
+from app.schemas.token import Token
 
 
 # 인증(Authentication) 관련 비즈니스 로직을 처리하는 서비스 클래스입니다.

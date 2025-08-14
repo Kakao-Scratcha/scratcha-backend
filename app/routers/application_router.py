@@ -1,14 +1,14 @@
-# routers/applications.py
+# app/routers/application_router.py
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from typing import List
 
-from ..models.user import User
-from ..core.security import get_current_user
-from .deps_router import get_db
-from ..schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationResponse
-from ..services.application_service import ApplicationService
+from app.models.user import User
+from app.core.security import get_current_user
+from db.session import get_db
+from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationResponse
+from app.services.application_service import ApplicationService
 
 router = APIRouter(
     prefix="/applications",
@@ -91,7 +91,7 @@ def update_application(
     description="애플리케이션을 소프트 삭제합니다.",
 )
 def delete_application(
-    appId: str,  # 애플리케이션 ID
+    appId: int,  # 애플리케이션 ID
     currentUser: User = Depends(get_current_user),
     service: ApplicationService = Depends(service)
 ):

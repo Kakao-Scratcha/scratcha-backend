@@ -2,10 +2,10 @@ from typing import List
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..repositories.api_key_repo import ApiKeyRepository
-from ..models.api_key import ApiKey
-from ..models.user import User
-from ..schemas.api_key import ApiKeyResponse
+from app.repositories.api_key_repo import ApiKeyRepository
+from app.models.api_key import ApiKey
+from app.models.user import User
+from app.schemas.api_key import ApiKeyResponse
 
 
 class ApiKeyService:

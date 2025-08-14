@@ -2,10 +2,10 @@ from typing import Any
 from sqladmin import ModelView
 from starlette.requests import Request
 
-from ..models.user import User
-from ..models.application import Application
-from ..models.api_key import ApiKey
-from ..core.security import get_password_hash
+from app.models.user import User
+from app.models.application import Application
+from app.models.api_key import ApiKey
+from app.core.security import get_password_hash
 
 
 class UserAdmin(ModelView, model=User):

@@ -11,4 +11,4 @@ class CaptchaProblemResponse(BaseModel):
     options: List[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True

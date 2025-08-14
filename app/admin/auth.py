@@ -3,8 +3,8 @@ from starlette.requests import Request
 from sqlalchemy.orm import Session
 
 from db.session import SessionLocal
-from ..models.user import User, UserRole
-from ..core.security import verify_password
+from app.models.user import User, UserRole
+from app.core.security import verify_password
 
 
 class AdminAuth(AuthenticationBackend):

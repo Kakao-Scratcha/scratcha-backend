@@ -1,4 +1,4 @@
-# backend/repositories/captcha_repo.py
+# app/repositories/captcha_repo.py
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func

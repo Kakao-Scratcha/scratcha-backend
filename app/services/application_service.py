@@ -4,14 +4,13 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from typing import List
 
-from ..models.user import User
-from ..models.api_key import ApiKey
-from ..models.application import Application
-from ..repositories.api_key_repo import ApiKeyRepository
-from ..repositories.application_repo import ApplicationRepository
-from ..schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
-from ..schemas.api_key import ApiKeyResponse
-from .api_key_service import ApiKeyService
+from app.models.user import User
+from app.models.api_key import ApiKey
+from app.models.application import Application
+from app.repositories.api_key_repo import ApiKeyRepository
+from app.repositories.application_repo import ApplicationRepository
+from app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
+from app.schemas.api_key import ApiKeyResponse
 
 # 사용자 구독 상태에 따른 최대 애플리케이션 개수 설정
 MAX_APPLICATIONS_PER_USER = {

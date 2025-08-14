@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
-from .api_key import ApiKeyResponse
+from app.schemas.api_key import ApiKeyResponse
 
 # 애플리케이션 생성 요청 스키마
 

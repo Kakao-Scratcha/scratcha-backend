@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 # 프로젝트 의존성 및 모델, 서비스 임포트
 from app.core.security import get_valid_api_key
 from app.models.api_key import ApiKey
-from app.routers.deps_router import get_db
+from db.session import get_db
 from app.schemas.captcha import CaptchaProblemResponse
 from app.services.captcha_service import CaptchaService
 

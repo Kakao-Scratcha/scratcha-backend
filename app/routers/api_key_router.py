@@ -1,14 +1,14 @@
-# routers/api_key.py
+# app/routers/api_key_router.py
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from typing import List
 
-from ..services.api_key_service import ApiKeyService
-from .deps_router import get_db
-from ..schemas.api_key import ApiKeyResponse
-from ..core.security import get_current_user
-from ..models.user import User
+from db.session import get_db
+from app.services.api_key_service import ApiKeyService
+from app.schemas.api_key import ApiKeyResponse
+from app.core.security import get_current_user
+from app.models.user import User
 
 router = APIRouter(
     prefix="/api-keys",
