@@ -74,6 +74,6 @@ class Application(Base):
     api_key = relationship(
         "ApiKey",
         back_populates="application",
-        uselist=False,  # 단일 객체임을 명시
+        # uselist=False,  # 단일 객체임을 명시
         cascade="all, delete-orphan"
     )

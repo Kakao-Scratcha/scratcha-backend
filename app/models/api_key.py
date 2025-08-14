@@ -29,7 +29,6 @@ class ApiKey(Base):
         "application_id",
         Integer,
         ForeignKey("application.id", ondelete="CASCADE"),
-        unique=True,
         nullable=False,
         comment="애플리케이션과 1:1"
     )

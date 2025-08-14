@@ -155,10 +155,11 @@ class ApplicationService:
                 detail="애플리케이션을 찾을 수 없습니다."
             )
 
+        # 4. 연결된 API 키를 삭제합니다.
+        if key:
+            self.apiKeyRepo.delete_key(key.id)
+
         # 3. 애플리케이션을 소프트 삭제합니다.
         self.appRepo.delete_application(appId)
-
-        # 4. 연결된 API 키를 삭제합니다.
-        self.apiKeyRepo.delete_key(key.id)
 
         return self.map_to_application_response(app, key)
