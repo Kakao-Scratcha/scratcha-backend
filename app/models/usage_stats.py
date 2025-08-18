@@ -1,0 +1,63 @@
+# backend/models/usage_stats.py
+
+from sqlalchemy import Column, Date, Integer, String, TEXT, DateTime, ForeignKey, func
+from sqlalchemy.orm import relationship
+import enum
+
+
+from db.base import Base
+
+
+class UsageStats(Base):
+    __tablename__ = "usage_stats"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+        comment="사용량 통계 ID"
+    )
+    apiKeyId = Column(
+        "api_key_id",
+        Integer,
+        ForeignKey("api_key.id"),
+        nullable=False,
+        comment="통계의 기준이되는 API 키"
+    )
+    date = Column(
+        "date",
+        Date,
+        nullable=False,
+        comment="통계 기준 날짜 (예: 2025-07-01)"
+    )
+    captchaTotalRequests = Column(
+        "captcha_total_requests",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="전체 요청 수"
+    )
+    captchaSuccessCountcaptcha_success_count = Column(
+        "captcha_success_count",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="성공 응답 수"
+    )
+    captchaFailCount = Column(
+        "captcha_fail_count",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="성공 응답 수"
+    )
+    created_at = Column(
+        "created_at",
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        comment="레코드 생성 시각 (기본값으로 현재 시각 사용)"
+    )
+
+    # 관계 설정 (API 키 객체를 역방향으로 참조)
+    api_key = relationship("ApiKey", back_populates="usage_stats")

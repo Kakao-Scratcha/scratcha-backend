@@ -19,7 +19,7 @@ class CaptchaSession(Base):
     apiKeyId = Column(
         "api_key_id",
         Integer,
-        ForeignKey("api_key.id", ondelete="CASCADE"),
+        ForeignKey("api_key.id"),
         nullable=False,
         comment="사용된 API 키"
     )
@@ -48,11 +48,8 @@ class CaptchaSession(Base):
     )
 
     # N:1 관계
-    problem = relationship("CaptchaProblem", back_populates="sessions")
+    captchaProblem = relationship(
+        "CaptchaProblem", back_populates="captchaSession")
 
     # 1:N 관계
-    logs = relationship(
-        "CaptchaLog",
-        back_populates="session",
-        cascade="all, delete-orphan"
-    )
+    captchaLog = relationship("CaptchaLog", back_populates="captchaSession")

@@ -73,4 +73,5 @@ class CaptchaProblem(Base):
     )
 
     # 1:N 관계
-    sessions = relationship("CaptchaSession", back_populates="problem")
+    captchaSession = relationship(
+        "CaptchaSession", back_populates="captchaProblem")

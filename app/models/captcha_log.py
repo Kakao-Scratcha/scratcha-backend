@@ -11,6 +11,7 @@ from db.base import Base
 class CaptchaResult(enum.Enum):
     SUCCESS = "success"
     FAIL = "fail"
+    TIMEOUT = "timeout"
 
 
 class CaptchaLog(Base):
@@ -50,21 +51,28 @@ class CaptchaLog(Base):
         "result",
         Enum(CaptchaResult),
         nullable=False,
-        comment="성공 / 실패 결과"
+        comment="성공 / 실패 / 타임아웃"
     )
     latency_ms = Column(
         "latency_ms",
         Integer,
         nullable=False,
-        comment="응답 지연 시간 (ms)"
+        comment="캡챠 문제가 해결되기까지 걸린 시간(밀리초)"
     )
-    createdAt = Column(
+    created_at = Column(
         "created_at",
         DateTime,
         nullable=False,
         server_default=func.now(),
-        comment="생성 시각"
+        comment="문제 생성 시간"
     )
 
-    # N:1 관계
-    session = relationship("CaptchaSession", back_populates="logs")
+    apiKey = relationship(
+        "ApiKey",
+        back_populates="captchaLog"
+    )
+
+    captchaSession = relationship(
+        "CaptchaSession",
+        back_populates="captchaLog"
+    )
