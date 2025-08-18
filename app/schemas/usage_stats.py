@@ -1,5 +1,4 @@
 from datetime import date
-from typing import List, Optional
 from pydantic import BaseModel
 
 
@@ -18,6 +17,8 @@ class DailyUsageSummary(BaseModel):
     todayRequests: int
     yesterdayRequests: int
     ratioVsYesterday: float
+    captchaSuccessCount: int
+    captchaFailCount: int
 
 
 class WeeklyUsageSummary(BaseModel):
@@ -25,6 +26,8 @@ class WeeklyUsageSummary(BaseModel):
     thisWeekRequests: int
     lastWeekRequests: int
     ratioVsLastWeek: float
+    captchaSuccessCount: int
+    captchaFailCount: int
 
 
 class MonthlyUsageSummary(BaseModel):
@@ -32,3 +35,16 @@ class MonthlyUsageSummary(BaseModel):
     thisMonthRequests: int
     lastMonthRequests: int
     ratioVsLastMonth: float
+    captchaSuccessCount: int
+    captchaFailCount: int
+
+
+class TotalRequests(BaseModel):
+    """유저의 전체 캡챠 요청 수"""
+    totalRequests: int
+
+
+class ResultsCounts(BaseModel):
+    """성공 수, 실패 수 스키마"""
+    captchaSuccessCount: int
+    captchaFailCount: int

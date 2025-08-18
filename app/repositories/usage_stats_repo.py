@@ -52,9 +52,9 @@ class UsageStatsRepository:
 
         return query.all()
 
-    def getTotalRequestsForPeriod(self, userId: int, startDate: date, endDate: date) -> int:
+    def getSummaryForPeriod(self, userId: int, startDate: date, endDate: date) -> tuple[int, int, int]:
         """
-        특정 사용자와 날짜 범위에 대한 총 캡챠 요청 수를 반환합니다.
+        특정 사용자와 날짜 범위에 대한 총 요청 수, 성공 수, 실패 수를 반환합니다.
 
         Args:
             userId (int): 사용자의 ID.
@@ -62,10 +62,12 @@ class UsageStatsRepository:
             endDate (date): 조회 종료 날짜.
 
         Returns:
-            int: 기간 내 총 캡챠 요청 수.
+            tuple[int, int, int]: 총 요청 수, 성공 수, 실패 수의 튜플.
         """
         result = self.db.query(
-            func.sum(UsageStats.captchaTotalRequests)
+            func.sum(UsageStats.captchaTotalRequests),
+            func.sum(UsageStats.captchaSuccessCount),
+            func.sum(UsageStats.captchaFailCount)
         ).join(
             ApiKey, UsageStats.apiKeyId == ApiKey.id
         ).join(
@@ -74,6 +76,126 @@ class UsageStatsRepository:
             Application.userId == userId,
             UsageStats.date >= startDate,
             UsageStats.date <= endDate
-        ).scalar()  # 단일 스칼라 값(총합)을 반환합니다.
+        ).first()
+
+        total = result[0] if result and result[0] is not None else 0
+        success = result[1] if result and result[1] is not None else 0
+        fail = result[2] if result and result[2] is not None else 0
+
+        return total, success, fail
+
+    def getTotalRequests(self, userId: int) -> int:
+        """
+        특정 사용자의 전체 기간에 대한 총 캡챠 요청 수를 반환합니다.
+
+        Args:
+            userId (int): 사용자의 ID.
+
+        Returns:
+            int: 전체 기간 동안의 총 캡챠 요청 수.
+        """
+        result = self.db.query(
+            func.sum(UsageStats.captchaTotalRequests)
+        ).join(
+            ApiKey, UsageStats.apiKeyId == ApiKey.id
+        ).join(
+            Application, ApiKey.appId == Application.id
+        ).filter(
+            Application.userId == userId
+        ).scalar()
 
         return result if result is not None else 0
+
+    def getResultsCounts(self, userId: int) -> tuple[int, int]:
+        """
+        특정 사용자의 전체 기간에 대한 성공 및 실패한 캡챠 요청 수를 반환합니다.
+
+        Args:
+            userId (int): 사용자의 ID.
+
+        Returns:
+            tuple[int, int]: 성공 및 실패한 캡챠 요청 수의 튜플.
+        """
+        result = self.db.query(
+            func.sum(UsageStats.captchaSuccessCount),
+            func.sum(UsageStats.captchaFailCount)
+        ).join(
+            ApiKey, UsageStats.apiKeyId == ApiKey.id
+        ).join(
+            Application, ApiKey.appId == Application.id
+        ).filter(
+            Application.userId == userId
+        ).first()
+
+        success_count = result[0] if result and result[0] is not None else 0
+        fail_count = result[1] if result and result[1] is not None else 0
+
+        return success_count, fail_count
+
+    def getSummaryForPeriodByApiKey(self, apiKeyId: int, startDate: date, endDate: date) -> tuple[int, int, int]:
+        """
+        특정 API 키와 날짜 범위에 대한 총 요청 수, 성공 수, 실패 수를 반환합니다.
+
+        Args:
+            apiKeyId (int): API 키의 ID.
+            startDate (date): 조회 시작 날짜.
+            endDate (date): 조회 종료 날짜.
+
+        Returns:
+            tuple[int, int, int]: 총 요청 수, 성공 수, 실패 수의 튜플.
+        """
+        result = self.db.query(
+            func.sum(UsageStats.captchaTotalRequests),
+            func.sum(UsageStats.captchaSuccessCount),
+            func.sum(UsageStats.captchaFailCount)
+        ).filter(
+            UsageStats.apiKeyId == apiKeyId,
+            UsageStats.date >= startDate,
+            UsageStats.date <= endDate
+        ).first()
+
+        total = result[0] if result and result[0] is not None else 0
+        success = result[1] if result and result[1] is not None else 0
+        fail = result[2] if result and result[2] is not None else 0
+
+        return total, success, fail
+
+    def getTotalRequestsByApiKey(self, keyId: int) -> int:
+        """
+        특정 API 키의 전체 기간에 대한 총 캡챠 요청 수를 반환합니다.
+
+        Args:
+            keyId (int): API 키의 ID.
+
+        Returns:
+            int: 전체 기간 동안의 총 캡챠 요청 수.
+        """
+        result = self.db.query(
+            func.sum(UsageStats.captchaTotalRequests)
+        ).filter(
+            UsageStats.apiKeyId == keyId
+        ).scalar()
+
+        return result if result is not None else 0
+
+    def getResultsCountsByApiKey(self, keyId: int) -> tuple[int, int]:
+        """
+        특정 API 키의 전체 기간에 대한 성공 및 실패한 캡챠 요청 수를 반환합니다.
+
+        Args:
+            keyId (int): API 키의 ID.
+
+        Returns:
+            tuple[int, int]: 성공 및 실패한 캡챠 요청 수의 튜플.
+        """
+        result = self.db.query(
+            func.sum(UsageStats.captchaSuccessCount),
+            func.sum(UsageStats.captchaFailCount)
+        ).filter(
+            UsageStats.apiKeyId == keyId
+        ).first()
+
+        success_count = result[0] if result and result[0] is not None else 0
+        fail_count = result[1] if result and result[1] is not None else 0
+
+        return success_count, fail_count

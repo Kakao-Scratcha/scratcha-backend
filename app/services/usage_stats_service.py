@@ -1,179 +1,287 @@
 from datetime import date, timedelta
+from fastapi import HTTPException, status
 from app.repositories.usage_stats_repo import UsageStatsRepository
-from app.schemas.usage_stats import UsageStatsResponse, WeeklyUsageSummary, MonthlyUsageSummary, DailyUsageSummary
-from sqlalchemy.orm import Session
-import calendar
+from app.repositories.api_key_repo import ApiKeyRepository
+from app.schemas.usage_stats import ResultsCounts, TotalRequests, WeeklyUsageSummary, MonthlyUsageSummary, DailyUsageSummary
+from app.models.user import User
 
 
 class UsageStatsService:
     """
     사용량 통계 관련 비즈니스 로직을 처리하는 서비스입니다.
+
+    이 서비스는 사용자 ID 또는 API 키 ID를 기반으로 다양한 통계 정보를 조회하는 기능을 제공합니다.
+    - 사용자 전체의 주간, 월간, 일간 사용량 요약
+    - 사용자 전체의 총 요청 수 및 성공/실패 수
+    - 특정 API 키의 주간, 월간, 일간 사용량 요약
+    - 특정 API 키의 총 요청 수 및 성공/실패 수
     """
 
-    def __init__(self, repo: UsageStatsRepository):
+    def __init__(self, repo: UsageStatsRepository, api_key_repo: ApiKeyRepository):
+        """
+        서비스를 초기화합니다.
+
+        Args:
+            repo (UsageStatsRepository): 사용량 통계 리포지토리
+            api_key_repo (ApiKeyRepository): API 키 리포지토리
+        """
         self.repo = repo
+        self.api_key_repo = api_key_repo
 
-    def getDailyUsageStats(self, userId: int, startDate: date, endDate: date) -> UsageStatsResponse:
+    def _check_api_key_owner(self, apiKeyId: int, currentUser: User):
         """
-        사용자의 일별 사용량 통계를 조회하고 스키마 형식으로 반환합니다.
+        API 키의 소유권을 확인합니다.
+
+        요청한 사용자가 해당 API 키의 실제 소유자인지 확인하여, 권한이 없는 경우
+        HTTP 403 Forbidden 예외를 발생시킵니다.
 
         Args:
-            userId (int): 현재 인증된 사용자의 ID.
-            startDate (date): 통계 조회 시작 날짜.
-            endDate (date): 통계 조회 종료 날짜.
+            apiKeyId (int): 확인할 API 키의 ID
+            currentUser (User): 현재 인증된 사용자 객체
 
-        Returns:
-            UsageStatsResponse: 일별 통계 데이터 리스트를 포함한 응답 객체.
+        Raises:
+            HTTPException: API 키가 존재하지 않거나 사용자에게 소유권이 없는 경우
         """
-        # 리포지토리 메서드를 호출하여 데이터베이스에서 데이터를 가져옵니다.
-        dailyStatsData = self.repo.getDailyUsageByUserId(
-            userId, startDate, endDate)
-
-        # Pydantic 스키마를 사용하여 ORM 객체를 직렬화합니다.
-        formattedStats = [UsageStatsResponse(date=row[0],
-                                             captchaTotalRequests=row[1],
-                                             captchaSuccessCount=row[2],
-                                             captchaFailCount=row[3],
-                                             captchaTimeoutCount=row[4],
-                                             avgResponseTimeMs=row[5])
-                          for row in dailyStatsData]
-
-        return UsageStatsResponse(daily_stats=formattedStats)
-
-    def getWeeklySummary(self, userId: int) -> WeeklyUsageSummary:
-        """
-        이번 주, 지난 주 사용량 요약과 추이를 계산하여 반환합니다.
-        '이번 주'는 일요일부터 요청 시점까지의 기간을 의미하며,
-        '지난 주'는 그 전 주 전체(7일)를 의미합니다.
-
-        Args:
-            userId (int): 현재 인증된 사용자의 ID.
-
-        Returns:
-            WeeklyUsageSummary: 주간 사용량 요약 객체.
-        """
-        today = date.today()
-
-        # ISO weekday()는 월요일(1)부터 일요일(7)까지 반환합니다.
-        # 이를 일요일(0)부터 시작하는 로직으로 변환합니다.
-        # 즉, 일요일은 0, 월요일은 1, ..., 토요일은 6이 됩니다.
-        weekdayOffset = today.weekday() + 1
-        if weekdayOffset == 7:  # 일요일일 경우
-            weekdayOffset = 0
-
-        # 이번 주 (일요일부터 오늘까지) 기간 계산
-        thisWeekStartDate = today - timedelta(days=weekdayOffset)
-        thisWeekEndDate = today  # 오늘까지의 데이터만 조회
-
-        # 지난 주 (전체 7일) 기간 계산
-        lastWeekStartDate = thisWeekStartDate - timedelta(days=7)
-        lastWeekEndDate = thisWeekStartDate - timedelta(days=1)
-
-        # 리포지토리에서 각 기간의 총 요청 수 조회
-        thisWeekRequests = self.repo.getTotalRequestsForPeriod(
-            userId, thisWeekStartDate, thisWeekEndDate
-        )
-        lastWeekRequests = self.repo.getTotalRequestsForPeriod(
-            userId, lastWeekStartDate, lastWeekEndDate
-        )
-
-        # 지난 주 대비 이번 주 요청 수 증감률을 백분율로 계산
-        if lastWeekRequests > 0:
-            ratioChange = round(
-                ((thisWeekRequests - lastWeekRequests) / lastWeekRequests) * 100, 2)
-        elif thisWeekRequests > 0:
-            # 지난 주 요청이 0인데 이번 주 요청이 0보다 크면 100% 증가로 처리
-            ratioChange = 100.0
-        else:
-            # 두 기간 모두 요청이 0건이면 0% 변화
-            ratioChange = 0.0
-
-        return WeeklyUsageSummary(
-            thisWeekRequests=thisWeekRequests,
-            lastWeekRequests=lastWeekRequests,
-            ratioVsLastWeek=ratioChange
-        )
-
-    def getMonthlySummary(self, userId: int) -> MonthlyUsageSummary:
-        """
-        이번 달, 지난 달 사용량 요약과 추이를 계산하여 반환합니다.
-        '이번 달'은 1일부터 요청 시점까지의 기간을 의미하며,
-        '지난 달'은 그 전 달 전체를 의미합니다.
-
-        Args:
-            userId (int): 현재 인증된 사용자의 ID.
-
-        Returns:
-            MonthlyUsageSummary: 월간 사용량 요약 객체.
-        """
-        today = date.today()
-
-        # 이번 달 (1일부터 오늘까지) 기간 계산
-        thisMonthStartDate = today.replace(day=1)
-        thisMonthEndDate = today
-
-        # 지난 달 (전체) 기간 계산
-        # 현재 달에서 1달을 빼서 지난 달을 구하고, 지난 달의 마지막 날짜를 구합니다.
-        lastMonthEndDate = thisMonthStartDate - timedelta(days=1)
-        lastMonthStartDate = lastMonthEndDate.replace(day=1)
-
-        # 리포지토리에서 각 기간의 총 요청 수 조회
-        thisMonthRequests = self.repo.getTotalRequestsForPeriod(
-            userId, thisMonthStartDate, thisMonthEndDate
-        )
-        lastMonthRequests = self.repo.getTotalRequestsForPeriod(
-            userId, lastMonthStartDate, lastMonthEndDate
-        )
-
-        # 지난 달 대비 이번 달 요청 수 증감률을 백분율로 계산
-        if lastMonthRequests > 0:
-            ratioChange = round(
-                ((thisMonthRequests - lastMonthRequests) / lastMonthRequests) * 100, 2)
-        elif thisMonthRequests > 0:
-            # 지난 달 요청이 0인데 이번 달 요청이 0보다 크면 100% 증가로 처리
-            ratioChange = 100.0
-        else:
-            # 두 기간 모두 요청이 0건이면 0% 변화
-            ratioChange = 0.0
-
-        return MonthlyUsageSummary(
-            thisMonthRequests=thisMonthRequests,
-            lastMonthRequests=lastMonthRequests,
-            ratioVsLastMonth=ratioChange
-        )
+        api_key = self.api_key_repo.get_key_by_key_id(apiKeyId)
+        if not api_key or api_key.application.userId != currentUser.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this API key."
+            )
 
     def getDailySummary(self, userId: int) -> DailyUsageSummary:
         """
-        오늘과 어제 사용량 요약과 추이를 계산하여 반환합니다.
-
-        Args:
-            userId (int): 현재 인증된 사용자의 ID.
-
-        Returns:
-            DailyUsageSummary: 일간 사용량 요약 객체.
+        사용자 기준: 오늘과 어제의 사용량 요약을 반환합니다.
         """
         today = date.today()
         yesterday = today - timedelta(days=1)
 
-        # 리포지토리에서 각 기간의 총 요청 수 조회
-        todayRequests = self.repo.getTotalRequestsForPeriod(
+        today_total, today_success, today_fail = self.repo.getSummaryForPeriod(
             userId, today, today)
-        yesterdayRequests = self.repo.getTotalRequestsForPeriod(
+        yesterday_total, _, _ = self.repo.getSummaryForPeriod(
             userId, yesterday, yesterday)
 
-        # 어제 대비 오늘 요청 수 증감률을 백분율로 계산
-        if yesterdayRequests > 0:
+        if yesterday_total > 0:
             ratioChange = round(
-                ((todayRequests - yesterdayRequests) / yesterdayRequests) * 100, 2)
-        elif todayRequests > 0:
-            # 어제 요청이 0인데 오늘 요청이 0보다 크면 100% 증가로 처리
+                ((today_total - yesterday_total) / yesterday_total) * 100, 2)
+        elif today_total > 0:
             ratioChange = 100.0
         else:
-            # 두 기간 모두 요청이 0건이면 0% 변화
             ratioChange = 0.0
 
         return DailyUsageSummary(
-            todayRequests=todayRequests,
-            yesterdayRequests=yesterdayRequests,
-            ratioVsYesterday=ratioChange
+            todayRequests=today_total,
+            yesterdayRequests=yesterday_total,
+            ratioVsYesterday=ratioChange,
+            captchaSuccessCount=today_success,
+            captchaFailCount=today_fail
+        )
+
+    def getWeeklySummary(self, userId: int) -> WeeklyUsageSummary:
+        """
+        사용자 기준: 이번 주와 지난주의 사용량 요약을 반환합니다.
+        """
+        today = date.today()
+        weekdayOffset = today.weekday() + 1
+        if weekdayOffset == 7:
+            weekdayOffset = 0
+
+        thisWeekStartDate = today - timedelta(days=weekdayOffset)
+        thisWeekEndDate = today
+        lastWeekStartDate = thisWeekStartDate - timedelta(days=7)
+        lastWeekEndDate = thisWeekStartDate - timedelta(days=1)
+
+        thisWeek_total, thisWeek_success, thisWeek_fail = self.repo.getSummaryForPeriod(
+            userId, thisWeekStartDate, thisWeekEndDate
+        )
+        lastWeek_total, _, _ = self.repo.getSummaryForPeriod(
+            userId, lastWeekStartDate, lastWeekEndDate
+        )
+
+        if lastWeek_total > 0:
+            ratioChange = round(
+                ((thisWeek_total - lastWeek_total) / lastWeek_total) * 100, 2)
+        elif thisWeek_total > 0:
+            ratioChange = 100.0
+        else:
+            ratioChange = 0.0
+
+        return WeeklyUsageSummary(
+            thisWeekRequests=thisWeek_total,
+            lastWeekRequests=lastWeek_total,
+            ratioVsLastWeek=ratioChange,
+            captchaSuccessCount=thisWeek_success,
+            captchaFailCount=thisWeek_fail
+        )
+
+    def getMonthlySummary(self, userId: int) -> MonthlyUsageSummary:
+        """
+        사용자 기준: 이번 달과 지난달의 사용량 요약을 반환합니다.
+        """
+        today = date.today()
+        thisMonthStartDate = today.replace(day=1)
+        thisMonthEndDate = today
+        lastMonthEndDate = thisMonthStartDate - timedelta(days=1)
+        lastMonthStartDate = lastMonthEndDate.replace(day=1)
+
+        thisMonth_total, thisMonth_success, thisMonth_fail = self.repo.getSummaryForPeriod(
+            userId, thisMonthStartDate, thisMonthEndDate
+        )
+        lastMonth_total, _, _ = self.repo.getSummaryForPeriod(
+            userId, lastMonthStartDate, lastMonthEndDate
+        )
+
+        if lastMonth_total > 0:
+            ratioChange = round(
+                ((thisMonth_total - lastMonth_total) / lastMonth_total) * 100, 2)
+        elif thisMonth_total > 0:
+            ratioChange = 100.0
+        else:
+            ratioChange = 0.0
+
+        return MonthlyUsageSummary(
+            thisMonthRequests=thisMonth_total,
+            lastMonthRequests=lastMonth_total,
+            ratioVsLastMonth=ratioChange,
+            captchaSuccessCount=thisMonth_success,
+            captchaFailCount=thisMonth_fail
+        )
+
+    def getTotalRequests(self, userId: int) -> TotalRequests:
+        """
+        사용자 기준: 전체 캡챠 요청 수를 조회합니다.
+        """
+        total_requests_count = self.repo.getTotalRequests(userId)
+        return TotalRequests(totalRequests=total_requests_count)
+
+    def getResultsCounts(self, userId: int) -> ResultsCounts:
+        """
+        사용자 기준: 전체 캡챠 성공 및 실패 수를 조회합니다.
+        """
+        success_count, fail_count = self.repo.getResultsCounts(userId)
+        return ResultsCounts(
+            captchaSuccessCount=success_count,
+            captchaFailCount=fail_count
+        )
+
+    # --- API 키 기준 통계 --- #
+
+    def getWeeklySummaryByApiKey(self, apiKeyId: int, currentUser: User) -> WeeklyUsageSummary:
+        """
+        API 키 기준: 이번 주와 지난주의 사용량 요약을 반환합니다.
+        """
+        self._check_api_key_owner(apiKeyId, currentUser)
+        today = date.today()
+        weekdayOffset = today.weekday() + 1
+        if weekdayOffset == 7:
+            weekdayOffset = 0
+        thisWeekStartDate = today - timedelta(days=weekdayOffset)
+        thisWeekEndDate = today
+        lastWeekStartDate = thisWeekStartDate - timedelta(days=7)
+        lastWeekEndDate = thisWeekStartDate - timedelta(days=1)
+
+        thisWeek_total, thisWeek_success, thisWeek_fail = self.repo.getSummaryForPeriodByApiKey(
+            apiKeyId, thisWeekStartDate, thisWeekEndDate
+        )
+        lastWeek_total, _, _ = self.repo.getSummaryForPeriodByApiKey(
+            apiKeyId, lastWeekStartDate, lastWeekEndDate
+        )
+
+        if lastWeek_total > 0:
+            ratioChange = round(
+                ((thisWeek_total - lastWeek_total) / lastWeek_total) * 100, 2)
+        elif thisWeek_total > 0:
+            ratioChange = 100.0
+        else:
+            ratioChange = 0.0
+
+        return WeeklyUsageSummary(
+            thisWeekRequests=thisWeek_total,
+            lastWeekRequests=lastWeek_total,
+            ratioVsLastWeek=ratioChange,
+            captchaSuccessCount=thisWeek_success,
+            captchaFailCount=thisWeek_fail
+        )
+
+    def getMonthlySummaryByApiKey(self, apiKeyId: int, currentUser: User) -> MonthlyUsageSummary:
+        """
+        API 키 기준: 이번 달과 지난달의 사용량 요약을 반환합니다.
+        """
+        self._check_api_key_owner(apiKeyId, currentUser)
+        today = date.today()
+        thisMonthStartDate = today.replace(day=1)
+        thisMonthEndDate = today
+        lastMonthEndDate = thisMonthStartDate - timedelta(days=1)
+        lastMonthStartDate = lastMonthEndDate.replace(day=1)
+
+        thisMonth_total, thisMonth_success, thisMonth_fail = self.repo.getSummaryForPeriodByApiKey(
+            apiKeyId, thisMonthStartDate, thisMonthEndDate
+        )
+        lastMonth_total, _, _ = self.repo.getSummaryForPeriodByApiKey(
+            apiKeyId, lastMonthStartDate, lastMonthEndDate
+        )
+
+        if lastMonth_total > 0:
+            ratioChange = round(
+                ((thisMonth_total - lastMonth_total) / lastMonth_total) * 100, 2)
+        elif thisMonth_total > 0:
+            ratioChange = 100.0
+        else:
+            ratioChange = 0.0
+
+        return MonthlyUsageSummary(
+            thisMonthRequests=thisMonth_total,
+            lastMonthRequests=lastMonth_total,
+            ratioVsLastMonth=ratioChange,
+            captchaSuccessCount=thisMonth_success,
+            captchaFailCount=thisMonth_fail
+        )
+
+    def getDailySummaryByApiKey(self, apiKeyId: int, currentUser: User) -> DailyUsageSummary:
+        """
+        API 키 기준: 오늘과 어제의 사용량 요약을 반환합니다.
+        """
+        self._check_api_key_owner(apiKeyId, currentUser)
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+
+        today_total, today_success, today_fail = self.repo.getSummaryForPeriodByApiKey(
+            apiKeyId, today, today)
+        yesterday_total, _, _ = self.repo.getSummaryForPeriodByApiKey(
+            apiKeyId, yesterday, yesterday)
+
+        if yesterday_total > 0:
+            ratioChange = round(
+                ((today_total - yesterday_total) / yesterday_total) * 100, 2)
+        elif today_total > 0:
+            ratioChange = 100.0
+        else:
+            ratioChange = 0.0
+
+        return DailyUsageSummary(
+            todayRequests=today_total,
+            yesterdayRequests=yesterday_total,
+            ratioVsYesterday=ratioChange,
+            captchaSuccessCount=today_success,
+            captchaFailCount=today_fail
+        )
+
+    def getTotalRequestsByApiKey(self, apiKeyId: int, currentUser: User) -> TotalRequests:
+        """
+        API 키 기준: 전체 캡챠 요청 수를 조회합니다.
+        """
+        self._check_api_key_owner(apiKeyId, currentUser)
+        total_requests_count = self.repo.getTotalRequestsByApiKey(apiKeyId)
+        return TotalRequests(totalRequests=total_requests_count)
+
+    def getResultsCountsByApiKey(self, apiKeyId: int, currentUser: User) -> ResultsCounts:
+        """
+        API 키 기준: 전체 캡챠 성공 및 실패 수를 조회합니다.
+        """
+        self._check_api_key_owner(apiKeyId, currentUser)
+        success_count, fail_count = self.repo.getResultsCountsByApiKey(
+            apiKeyId)
+        return ResultsCounts(
+            captchaSuccessCount=success_count,
+            captchaFailCount=fail_count
         )
