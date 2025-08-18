@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
 from db.session import engine
 from sqladmin import Admin
 
-from app.routers import users_router, auth_router, application_router, api_key_router, captcha_router
+from app.routers import users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
 from app.admin.admin import UserAdmin, ApplicationAdmin, ApiKeyAdmin
 from app.admin.auth import AdminAuth
 
@@ -54,4 +54,5 @@ app.include_router(users_router.router, prefix="/api/dashboard")
 app.include_router(auth_router.router, prefix="/api/dashboard")
 app.include_router(application_router.router, prefix="/api/dashboard")
 app.include_router(api_key_router.router, prefix="/api/dashboard")
+app.include_router(usage_stats_router.router, prefix="/api/dashboard")
 app.include_router(captcha_router.router, prefix="/api")

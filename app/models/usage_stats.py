@@ -37,7 +37,7 @@ class UsageStats(Base):
         default=0,
         comment="전체 요청 수"
     )
-    captchaSuccessCountcaptcha_success_count = Column(
+    captchaSuccessCount = Column(
         "captcha_success_count",
         Integer,
         nullable=False,
