@@ -14,7 +14,7 @@ class ApplicationRepository:
         self.db = db
 
     #  애플리케이션 생성 CRUD
-    def create_application(self, userId: int,  appCreate: ApplicationCreate) -> Application:
+    def createpplication(self, userId: int,  appCreate: ApplicationCreate) -> Application:
         """새로운 애플리케이션을 생성합니다."""
 
         # 1. 애플리케이션 객체를 생성합니다.

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from db.session import get_db
-from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.schemas.user import UserCreate, UserResponse, UserUpdate, UserPlanUpdate
 from app.services.user_service import UserService
 from app.core.security import get_current_user, get_current_admin_user
 from app.models.user import User
@@ -96,6 +96,23 @@ def delete_user(
         )
 
     return deletedUser
+
+
+@router.patch(
+    "/{userId}/plan",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="사용자 플랜 업데이트",
+    description="특정 사용자의 구독 플랜을 업데이트합니다. (관리자 또는 해당 사용자만 가능)",
+)
+def update_user_plan(
+    userId: int,
+    planUpdate: UserPlanUpdate,
+    currentUser: User = Depends(get_current_user),
+    userService: UserService = Depends(get_user_service)
+):
+    updatedUser = userService.update_user_plan(userId, planUpdate, currentUser)
+    return updatedUser
 
 
 # --- 관리자 전용 API 엔드포인트 추가 ---

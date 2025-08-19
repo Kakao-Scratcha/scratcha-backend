@@ -7,24 +7,8 @@ from app.models.user import User
 
 
 class UsageStatsService:
-    """
-    사용량 통계 관련 비즈니스 로직을 처리하는 서비스입니다.
-
-    이 서비스는 사용자 ID 또는 API 키 ID를 기반으로 다양한 통계 정보를 조회하는 기능을 제공합니다.
-    - 사용자 전체의 주간, 월간, 일간 사용량 요약
-    - 사용자 전체의 총 요청 수 및 성공/실패 수
-    - 특정 API 키의 주간, 월간, 일간 사용량 요약
-    - 특정 API 키의 총 요청 수 및 성공/실패 수
-    """
 
     def __init__(self, repo: UsageStatsRepository, api_key_repo: ApiKeyRepository):
-        """
-        서비스를 초기화합니다.
-
-        Args:
-            repo (UsageStatsRepository): 사용량 통계 리포지토리
-            api_key_repo (ApiKeyRepository): API 키 리포지토리
-        """
         self.repo = repo
         self.api_key_repo = api_key_repo
 

@@ -51,7 +51,18 @@ class UserRepository:
         self.db.refresh(dbUser)  # 최신 데이터로 객체 새로고침
         return dbUser
 
+    def update_user_plan(self, dbUser: User, new_plan: str) -> User:
+        """
+        사용자의 구독 플랜을 업데이트합니다.
+        """
+        dbUser.plan = new_plan
+        self.db.add(dbUser)
+        self.db.commit()
+        self.db.refresh(dbUser)
+        return dbUser
+
     # 사용자 삭제 (soft delete) CRUD
+
     def delete_user(self, dbUser: User) -> User:
         """
         User 객체를 소프트 삭제합니다.

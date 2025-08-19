@@ -8,7 +8,8 @@ import re
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
-from app.schemas.user import UserCreate, UserUpdate
+from app.schemas.user import UserCreate, UserUpdate, UserPlanUpdate
+from app.models.user import User, UserRole
 
 
 USER_NAME_PATTERN = re.compile(r"^[가-힣a-zA-Z0-9]+$")
@@ -103,6 +104,28 @@ class UserService:
         updatedUser = self.userRepo.update_user(user, userUpdate)
 
         return updatedUser
+
+    def update_user_plan(self, userId: int, planUpdate: UserPlanUpdate, currentUser: User) -> User:
+        """
+        사용자의 구독 플랜을 업데이트합니다.
+        """
+        user = self.userRepo.get_user_by_id(userId)
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="사용자를 찾을 수 없습니다."
+            )
+
+        # 권한 확인: 현재 사용자가 업데이트 대상 사용자이거나 관리자여야 합니다.
+        if currentUser.id != userId and currentUser.role != UserRole.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="플랜을 업데이트할 권한이 없습니다."
+            )
+
+        updated_user = self.userRepo.update_user_plan(user, planUpdate.plan)
+        return updated_user
 
     def delete_user(self, userId: str) -> User:
         """

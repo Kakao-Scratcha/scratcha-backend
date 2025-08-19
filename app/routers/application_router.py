@@ -7,7 +7,7 @@ from typing import List
 from app.models.user import User
 from app.core.security import get_current_user
 from db.session import get_db
-from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationResponse
+from app.schemas.application import ApplicationCreate, ApplicationUpdate, ApplicationResponse, CountResponse
 from app.services.application_service import ApplicationService
 
 router = APIRouter(
@@ -49,6 +49,20 @@ def get_applications(
     service: ApplicationService = Depends(service)
 ):
     return service.get_applications(currentUser)
+
+
+@router.get(
+    "/count",
+    response_model=CountResponse,
+    status_code=status.HTTP_200_OK,
+    summary="내 애플리케이션 수량 조회",
+    description="현재 인증된 사용자의 모든 애플리케이션 수량을 조회합니다.",
+)
+def get_applications_count(
+    currentUser: User = Depends(get_current_user),
+    service: ApplicationService = Depends(service)
+):
+    return service.get_applications_count(currentUser)
 
 
 @router.get(

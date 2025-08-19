@@ -59,3 +59,7 @@ class ApplicationResponse(BaseModel):
 
     class Config:
         from_attributes = True  # Pydantic v2: orm_mode 대신 from_attributes 사용
+
+
+class CountResponse(BaseModel):
+    count: int

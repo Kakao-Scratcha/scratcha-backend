@@ -97,3 +97,11 @@ class UserResponse(BaseModel):
         from_attributes = True  # Pydantic v2: orm_mode 대신 from_attributes 사용
         alias_generator = to_camel  # 카멜케이스 유지
         populate_by_name = True
+
+
+class UserPlanUpdate(BaseModel):
+    plan: UserSubscription = Field(
+        ...,
+        description="업데이트할 사용자 구독 플랜",
+        example="PRO"
+    )

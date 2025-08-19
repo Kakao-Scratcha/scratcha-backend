@@ -9,7 +9,7 @@ from app.models.api_key import ApiKey
 from app.models.application import Application
 from app.repositories.api_key_repo import ApiKeyRepository
 from app.repositories.application_repo import ApplicationRepository
-from app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate
+from app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate, CountResponse
 from app.schemas.api_key import ApiKeyResponse
 
 # 사용자 구독 상태에 따른 최대 애플리케이션 개수 설정
@@ -104,6 +104,12 @@ class ApplicationService:
                 (key for key in keys if key.appId == app.id), None))
             for app in apps
         ]
+
+    def get_applications_count(self, currentuser: User) -> CountResponse:
+        """사용자가 생성한 애플리케이션의 수를 조회합니다."""
+
+        count = self.appRepo.get_applications_count_by_user_id(currentuser.id)
+        return CountResponse(count=count)
 
     def get_application(self, appId: int, currentUser: User) -> ApplicationResponse:
         """애플리케이션 ID로 단일 애플리케이션을 조회합니다."""
