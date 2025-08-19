@@ -4,6 +4,7 @@ from datetime import date
 from app.models.usage_stats import UsageStats
 from app.models.api_key import ApiKey
 from app.models.application import Application
+from app.models.captcha_log import CaptchaLog
 
 
 class UsageStatsRepository:
@@ -132,6 +133,8 @@ class UsageStatsRepository:
 
         return success_count, fail_count
 
+    # --- API 키 기준 통계 --- #
+
     def getSummaryForPeriodByApiKey(self, apiKeyId: int, startDate: date, endDate: date) -> tuple[int, int, int]:
         """
         특정 API 키와 날짜 범위에 대한 총 요청 수, 성공 수, 실패 수를 반환합니다.
@@ -199,3 +202,39 @@ class UsageStatsRepository:
         fail_count = result[1] if result and result[1] is not None else 0
 
         return success_count, fail_count
+
+    def getUsageDataLogs(self, userId: int = None, apiKeyId: int = None, skip: int = 0, limit: int = 100) -> tuple[list, int]:
+        """
+        사용자 또는 API 키별 캡챠 사용량 로그를 조회합니다.
+
+        Args:
+            userId (int, optional): 사용자의 ID. Defaults to None.
+            apiKeyId (int, optional): API 키의 ID. Defaults to None.
+            skip (int): 건너뛸 레코드 수. Defaults to 0.
+            limit (int): 가져올 최대 레코드 수. Defaults to 100.
+
+        Returns:
+            tuple[list, int]: 조회된 사용량 로그 객체의 리스트와 전체 개수.
+        """
+        base_query = self.db.query(
+            CaptchaLog.id,
+            Application.appName,
+            ApiKey.key,
+            CaptchaLog.created_at,
+            CaptchaLog.result,
+            CaptchaLog.latency_ms
+        ).join(
+            ApiKey, CaptchaLog.apiKeyId == ApiKey.id
+        ).join(
+            Application, ApiKey.appId == Application.id
+        )
+
+        if userId:
+            base_query = base_query.filter(Application.userId == userId)
+        if apiKeyId:
+            base_query = base_query.filter(ApiKey.id == apiKeyId)
+
+        total_count = base_query.count()
+        logs = base_query.offset(skip).limit(limit).all()
+
+        return logs, total_count

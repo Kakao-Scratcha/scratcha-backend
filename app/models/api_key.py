@@ -82,7 +82,7 @@ class ApiKey(Base):
 
     # N:1 관계
     user = relationship("User")
-    application = relationship("Application", back_populates="api_key")
+    application = relationship("Application", back_populates="apiKey")
 
     captchaLog = relationship("CaptchaLog", back_populates="apiKey")
-    usage_stats = relationship("UsageStats", back_populates="api_key")
+    usageStats = relationship("UsageStats", back_populates="apiKey")

@@ -13,7 +13,7 @@ class CaptchaRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_random_active_problem(self) -> Optional[CaptchaProblem]:
+    def getRandomActiveProblem(self) -> Optional[CaptchaProblem]:
         """활성화된 캡챠 문제 중 하나를 무작위로 선택합니다."""
         validProblems = self.db.query(CaptchaProblem).filter(
             CaptchaProblem.expiresAt > func.now()
@@ -24,7 +24,7 @@ class CaptchaRepository:
 
         return random.choice(validProblems)
 
-    def create_captcha_session(self, apiKeyId: int, captchaProblemId: int, clientToken: str) -> CaptchaSession:
+    def createCaptchaSession(self, apiKeyId: int, captchaProblemId: int, clientToken: str) -> CaptchaSession:
         """새로운 캡챠 세션을 생성하고 DB에 저장합니다."""
         captchaSession = CaptchaSession(
             apiKeyId=apiKeyId,

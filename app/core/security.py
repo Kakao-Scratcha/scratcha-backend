@@ -33,7 +33,7 @@ oauth2Scheme = OAuth2PasswordBearer(tokenUrl="/api/dashboard/auth/login")
 httpBearerScheme = HTTPBearer()
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def createAccessToken(data: dict, expires_delta: timedelta | None = None) -> str:
     """
     JWT 액세스 토큰을 생성합니다.
     Args:
@@ -55,7 +55,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return encodedJwt
 
 
-def decode_jwt_token(token: str) -> dict:
+def decodeJwtToken(token: str) -> dict:
     """
     JWT 토큰의 유효성(서명, 만료 등)을 검증하고 payload(dict)를 반환합니다.
     Args:
@@ -77,7 +77,7 @@ def decode_jwt_token(token: str) -> dict:
 
 
 # 인증만 필요한 라우터에서 사용: JWT payload(dict) 반환
-async def get_jwt_payload(token_object: HTTPBearer = Depends(httpBearerScheme)) -> dict:
+async def getJwtPayload(token_object: HTTPBearer = Depends(httpBearerScheme)) -> dict:
     """
     HTTPBearer 인증 헤더에서 JWT 토큰을 추출해 payload(dict)를 반환합니다.
     Args:
@@ -86,10 +86,10 @@ async def get_jwt_payload(token_object: HTTPBearer = Depends(httpBearerScheme)) 
         dict: JWT payload
     """
     # HTTP Authorization 헤더에서 Bearer 토큰 추출 후 decode
-    return decode_jwt_token(token_object.credentials)
+    return decodeJwtToken(token_object.credentials)
 
 
-def get_email_from_payload(payload: dict) -> str:
+def getEmailFromPayload(payload: dict) -> str:
     """
     JWT payload(dict)에서 이메일(sub claim)을 추출합니다.
     Args:
@@ -109,8 +109,8 @@ def get_email_from_payload(payload: dict) -> str:
 
 
 # User 객체가 필요한 라우터에서 사용: JWT 토큰에서 사용자 이메일을 추출하고 DB에서 User 객체를 반환합니다.
-def get_current_user(
-    payload: dict = Depends(get_jwt_payload),
+def getCurrentUser(
+    payload: dict = Depends(getJwtPayload),
     db: Session = Depends(get_db)
 ) -> User:
     """
@@ -122,17 +122,17 @@ def get_current_user(
         User: 인증된 사용자 객체
     """
     # JWT payload에서 이메일 추출
-    email = get_email_from_payload(payload)
+    email = getEmailFromPayload(payload)
     # DB에서 사용자 조회
     user_repo = UserRepository(db)
-    user = user_repo.get_user_by_email(email)
+    user = user_repo.getUserByEmail(email)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
     return user
 
 
-def verify_password(plainPassword: str, hashedPassword: str) -> bool:
+def verifyPassword(plainPassword: str, hashedPassword: str) -> bool:
     """
     평문 비밀번호와 해시된 비밀번호를 비교하여 일치 여부를 반환합니다.
     Args:
@@ -145,7 +145,7 @@ def verify_password(plainPassword: str, hashedPassword: str) -> bool:
     return pwdContext.verify(plainPassword, hashedPassword)
 
 
-def get_password_hash(password: str) -> str:
+def getPasswordHash(password: str) -> str:
     """
     비밀번호를 bcrypt로 해싱하여 반환합니다.
     Args:
@@ -158,7 +158,7 @@ def get_password_hash(password: str) -> str:
 
 
 # API Key 인증이 필요한 라우터에서 사용: x-api-key 헤더의 유효성 검증
-async def get_valid_api_key(
+async def getValidApiKey(
     xApiKey: str = Header(..., alias="x-api-key"),
     db: Session = Depends(get_db)
 ) -> ApiKey:
@@ -172,7 +172,7 @@ async def get_valid_api_key(
     """
     # DB에서 API Key 유효성 검증
     apiKeyRepo = ApiKeyRepository(db)
-    apiKey = apiKeyRepo.get_active_api_key_by_target_key(xApiKey)
+    apiKey = apiKeyRepo.getActiveApiKeyByTargetKey(xApiKey)
 
     if not apiKey:
         raise HTTPException(
@@ -183,10 +183,11 @@ async def get_valid_api_key(
     return apiKey
 
 
-def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
+def getCurrentAdminUser(current_user: User = Depends(getCurrentUser)) -> User:
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="관리자 권한이 필요합니다."
         )
     return current_user
+

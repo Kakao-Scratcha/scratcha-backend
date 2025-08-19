@@ -16,7 +16,7 @@ class CaptchaService:
         self.db = db
         self.captchaRepo = CaptchaRepository(db)
 
-    def generate_captcha_problem(self, apiKey: ApiKey) -> CaptchaProblemResponse:
+    def generateCaptchaProblem(self, apiKey: ApiKey) -> CaptchaProblemResponse:
         """캡챠 문제를 생성하고 세션 정보를 반환하는 비즈니스 로직"""
 
         # 1. 사용자 토큰 잔액 확인 후 차감합니다.
@@ -36,7 +36,7 @@ class CaptchaService:
         self.db.commit()
 
         # 2. 유효한 캡챠 문제를 무작위로 선택합니다.
-        selectedProblem = self.captchaRepo.get_random_active_problem()
+        selectedProblem = self.captchaRepo.getRandomActiveProblem()
         if not selectedProblem:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -47,7 +47,7 @@ class CaptchaService:
 
         # 클라이언트 토큰을 생성합니다.
         clientToken = str(uuid.uuid4())
-        session = self.captchaRepo.create_captcha_session(
+        session = self.captchaRepo.createCaptchaSession(
             apiKeyId=apiKey.id,
             captchaProblemId=selectedProblem.id,
             clientToken=clientToken

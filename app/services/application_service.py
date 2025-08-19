@@ -28,7 +28,7 @@ class ApplicationService:
         self.appRepo = ApplicationRepository(db)
         self.apiKeyRepo = ApiKeyRepository(db)
 
-    def map_to_application_response(self, app: Application, key: ApiKey) -> ApplicationResponse:
+    def mapToApplicationResponse(self, app: Application, key: ApiKey) -> ApplicationResponse:
         """애플리케이션과 API 키 정보를 ApplicationResponse로 매핑합니다."""
 
         return ApplicationResponse(
@@ -50,7 +50,7 @@ class ApplicationService:
             deletedAt=app.deletedAt
         )
 
-    def create_application(self, currentUser: User, appCreate: ApplicationCreate) -> ApplicationResponse:
+    def createApplication(self, currentUser: User, appCreate: ApplicationCreate) -> ApplicationResponse:
         """애플리케이션과 API 키를 생성합니다."""
 
         # 1. 사용자가 구독한 요금제를 확인.
@@ -63,7 +63,7 @@ class ApplicationService:
             )
 
         # 2. 사용자의 애플리케이션 개수를 조회
-        currentAppsCount = self.appRepo.get_applications_count_by_user_id(
+        currentAppsCount = self.appRepo.getApplicationsCountByUserId(
             currentUser.id)
 
         # 3. 최대 애플리케이션 개수를 초과하는 경우 예외 처리
@@ -74,23 +74,23 @@ class ApplicationService:
             )
 
         # 4. 애플리케이션을 생성합니다.
-        app = self.appRepo.create_application(currentUser.id, appCreate)
+        app = self.appRepo.createApplication(currentUser.id, appCreate)
 
         # 5. API 키를 생성합니다.
-        key = self.apiKeyRepo.create_key(
+        key = self.apiKeyRepo.createKey(
             userId=currentUser.id,
             appId=app.id,
             expiresPolicy=appCreate.expiresPolicy
         )
 
-        return self.map_to_application_response(app, key)
+        return self.mapToApplicationResponse(app, key)
 
-    def get_applications(self, currentUser: User) -> List[ApplicationResponse]:
+    def getApplications(self, currentUser: User) -> List[ApplicationResponse]:
         """사용자의 모든 애플리케이션을 조회합니다."""
 
         # 1. 사용자의 애플리케이션 목록을 조회
-        apps = self.appRepo.get_applications_by_user_id(currentUser.id)
-        keys = self.apiKeyRepo.get_keys_by_user_id(currentUser.id)
+        apps = self.appRepo.getApplicationsByUserId(currentUser.id)
+        keys = self.apiKeyRepo.getKeysByUserId(currentUser.id)
 
         # 2. 사용자의 애플리케이션이 없는 경우 예외 처리 -> 빈배열 반환으로 수정 (2025.08.11)
         # if not apps:
@@ -100,23 +100,23 @@ class ApplicationService:
         #     )
 
         return [
-            self.map_to_application_response(app, next(
+            self.mapToApplicationResponse(app, next(
                 (key for key in keys if key.appId == app.id), None))
             for app in apps
         ]
 
-    def get_applications_count(self, currentuser: User) -> CountResponse:
+    def getApplicationsCount(self, currentuser: User) -> CountResponse:
         """사용자가 생성한 애플리케이션의 수를 조회합니다."""
 
-        count = self.appRepo.get_applications_count_by_user_id(currentuser.id)
+        count = self.appRepo.getApplicationsCountByUserId(currentuser.id)
         return CountResponse(count=count)
 
-    def get_application(self, appId: int, currentUser: User) -> ApplicationResponse:
+    def getApplication(self, appId: int, currentUser: User) -> ApplicationResponse:
         """애플리케이션 ID로 단일 애플리케이션을 조회합니다."""
 
         # 1. 애플리케이션을 조회합니다.
-        app = self.appRepo.get_application_by_app_id(appId)
-        key = self.apiKeyRepo.get_key_by_app_id(appId)
+        app = self.appRepo.getApplicationByAppId(appId)
+        key = self.apiKeyRepo.getKeyByAppId(appId)
 
         # 2. 애플리케이션이 없는 경우 예외 처리
         if not app or app.userId != currentUser.id:
@@ -125,14 +125,14 @@ class ApplicationService:
                 detail="애플리케이션을 찾을 수 없습니다."
             )
 
-        return self.map_to_application_response(app, key)
+        return self.mapToApplicationResponse(app, key)
 
-    def update_application(self, appId: int, currentUser: User, appUpdate: ApplicationUpdate) -> ApplicationResponse:
+    def updateApplication(self, appId: int, currentUser: User, appUpdate: ApplicationUpdate) -> ApplicationResponse:
         """애플리케이션 정보를 업데이트합니다."""
 
         # 1. 애플리케이션을 조회합니다.
-        app = self.appRepo.get_application_by_app_id(appId)
-        key = self.apiKeyRepo.get_key_by_app_id(appId)
+        app = self.appRepo.getApplicationByAppId(appId)
+        key = self.apiKeyRepo.getKeyByAppId(appId)
 
         # 2. 애플리케이션이 없는 경우 예외 처리
         if not app or app.userId != currentUser.id:
@@ -142,16 +142,16 @@ class ApplicationService:
             )
 
         # 3. 애플리케이션 정보를 업데이트합니다.
-        updatedApp = self.appRepo.update_application(app, appUpdate)
+        updatedApp = self.appRepo.updateApplication(app, appUpdate)
 
-        return self.map_to_application_response(updatedApp, key)
+        return self.mapToApplicationResponse(updatedApp, key)
 
-    def delete_application(self, appId: int, currentUser: User) -> ApplicationResponse:
+    def deleteApplication(self, appId: int, currentUser: User) -> ApplicationResponse:
         """애플리케이션을 소프트 삭제하고 연결된 API 키를 비활성화합니다."""
 
         # 1. 애플리케이션을 조회합니다.
-        app = self.appRepo.get_application_by_app_id(appId)
-        key = self.apiKeyRepo.get_key_by_app_id(appId)
+        app = self.appRepo.getApplicationByAppId(appId)
+        key = self.apiKeyRepo.getKeyByAppId(appId)
 
         # 2. 애플리케이션이 없는 경우 예외 처리
         if not app or app.userId != currentUser.id:
@@ -162,9 +162,9 @@ class ApplicationService:
 
         # 4. 연결된 API 키를 삭제합니다.
         if key:
-            self.apiKeyRepo.delete_key(key.id)
+            self.apiKeyRepo.deleteKey(key.id)
 
         # 3. 애플리케이션을 소프트 삭제합니다.
-        self.appRepo.delete_application(appId)
+        self.appRepo.deleteApplication(appId)
 
-        return self.map_to_application_response(app, key)
+        return self.mapToApplicationResponse(app, key)

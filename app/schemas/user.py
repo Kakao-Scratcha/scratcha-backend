@@ -103,5 +103,5 @@ class UserPlanUpdate(BaseModel):
     plan: UserSubscription = Field(
         ...,
         description="업데이트할 사용자 구독 플랜",
-        example="PRO"
+        example="pro"
     )

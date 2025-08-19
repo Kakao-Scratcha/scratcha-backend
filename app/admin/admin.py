@@ -5,7 +5,7 @@ from starlette.requests import Request
 from app.models.user import User
 from app.models.application import Application
 from app.models.api_key import ApiKey
-from app.core.security import get_password_hash
+from app.core.security import getPasswordHash
 
 
 class UserAdmin(ModelView, model=User):
@@ -69,12 +69,12 @@ class UserAdmin(ModelView, model=User):
 
     async def insert_model(self, request: Request, data: dict) -> Any:
         if _password := data.get("passwordHash"):
-            data["passwordHash"] = get_password_hash(_password)
+            data["passwordHash"] = getPasswordHash(_password)
         return await super().insert_model(request, data)
 
     async def update_model(self, request: Request, pk: str, data: dict) -> Any:
         if _password := data.get("passwordHash"):
-            data["passwordHash"] = get_password_hash(_password)
+            data["passwordHash"] = getPasswordHash(_password)
         return await super().update_model(request, pk, data)
 
 

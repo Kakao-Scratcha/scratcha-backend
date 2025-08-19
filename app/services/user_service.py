@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import re
 
-from app.core.security import get_password_hash, verify_password
+from app.core.security import getPasswordHash, verifyPassword
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
 from app.schemas.user import UserCreate, UserUpdate, UserPlanUpdate
@@ -20,30 +20,30 @@ class UserService:
     def __init__(self, db: Session):
         self.userRepo = UserRepository(db)
 
-    def get_user_by_id(self, userId: str) -> User:
-        return self.userRepo.get_user_by_id(userId)
+    def getUserById(self, userId: str) -> User:
+        return self.userRepo.getUserById(userId)
 
-    def create_user(self, userData: UserCreate) -> User:
+    def createUser(self, userData: UserCreate) -> User:
         """
         새로운 사용자를 데이터베이스에 추가합니다.
         """
         # 모든 상태의 사용자 (활성 또는 소프트 삭제됨) 중에서 이메일 중복을 확인합니다.
-        existingUser = self.userRepo.get_user_by_email(
+        existingUser = self.userRepo.getUserByEmail(
             userData.email, includeDeleted=True)
 
         if existingUser:
             # 이메일이 이미 존재하면 (소프트 삭제 상태 포함) None 반환하여 중복 알림
             return None
 
-        hashedPassword = get_password_hash(userData.password)
-        newUser = self.userRepo.create_user(userData, hashedPassword)
+        hashedPassword = getPasswordHash(userData.password)
+        newUser = self.userRepo.createUser(userData, hashedPassword)
 
         return newUser
 
-    def update_user(self, userId: str, userUpdate: UserUpdate) -> User:
+    def updateUser(self, userId: str, userUpdate: UserUpdate) -> User:
         """사용자의 프로필 정보를 업데이트합니다."""
 
-        user = self.userRepo.get_user_by_id(userId)
+        user = self.getUserById(userId)
 
         if not user:
             raise HTTPException(
@@ -86,7 +86,7 @@ class UserService:
                 )
 
             # 현재 비밀번호가 일치하는지 검증
-            if not verify_password(userUpdate.currnetPassword, user.passwordHash):
+            if not verifyPassword(userUpdate.currnetPassword, user.passwordHash):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="현재 비밀번호가 일치하지 않습니다."
@@ -99,17 +99,17 @@ class UserService:
                     detail="새 비밀번호는 현재 비밀번호와 동일할 수 없습니다."
                 )
             # 새 비밀번호를 해싱하여 user 객체에 할당
-            user.passwordHash = get_password_hash(userUpdate.newPassword)
+            user.passwordHash = getPasswordHash(userUpdate.newPassword)
 
-        updatedUser = self.userRepo.update_user(user, userUpdate)
+        updatedUser = self.userRepo.updateUser(user, userUpdate)
 
         return updatedUser
 
-    def update_user_plan(self, userId: int, planUpdate: UserPlanUpdate, currentUser: User) -> User:
+    def updateUserPlan(self, userId: int, planUpdate: UserPlanUpdate, currentUser: User) -> User:
         """
         사용자의 구독 플랜을 업데이트합니다.
         """
-        user = self.userRepo.get_user_by_id(userId)
+        user = self.userRepo.getUserById(userId)
 
         if not user:
             raise HTTPException(
@@ -124,43 +124,43 @@ class UserService:
                 detail="플랜을 업데이트할 권한이 없습니다."
             )
 
-        updated_user = self.userRepo.update_user_plan(user, planUpdate.plan)
+        updated_user = self.userRepo.updateUserPlan(user, planUpdate.plan)
         return updated_user
 
-    def delete_user(self, userId: str) -> User:
+    def deleteUser(self, userId: str) -> User:
         """
         User 객체를 소프트 삭제합니다.
         """
-        user = self.get_user_by_id(userId)
+        user = self.getUserById(userId)
 
         if not user:
             return None  # 사용자를 찾을 수 없음 (이미 소프트 삭제됨)
 
-        deletedUser = self.userRepo.delete_user(user)
+        deletedUser = self.userRepo.deleteUser(user)
 
         return deletedUser
 
     # (관리자용) 모든 사용자 목록 조회
-    def get_all_users_admin(self, includeDeleted: bool = False) -> List[User]:
+    def getAllUsersAdmin(self, includeDeleted: bool = False) -> List[User]:
         """
         관리자용: 모든 사용자 목록을 조회합니다.
         """
-        return self.userRepo.get_all_users_admin(includeDeleted)
+        return self.userRepo.getAllUsersAdmin(includeDeleted)
 
     # (관리자용) 특정 사용자 조회
-    def get_user_admin(self, userId: str, includeDeleted: bool = False) -> User | None:
+    def getUserAdmin(self, userId: str, includeDeleted: bool = False) -> User | None:
         """
         관리자용: 특정 사용자를 조회합니다.
         """
-        return self.userRepo.get_user_by_id_admin(userId, includeDeleted)
+        return self.userRepo.getUserByIdAdmin(userId, includeDeleted)
 
     # (관리자용) 사용자 계정 복구
-    def restore_user_admin(self, userId: str) -> User | None:
+    def restoreUserAdmin(self, userId: str) -> User | None:
         """
         관리자용: 특정 사용자의 계정을 복구합니다.
         """
         # 소프트 삭제된 사용자도 포함하여 조회합니다.
-        user = self.userRepo.get_user_by_id_admin(
+        user = self.userRepo.getUserByIdAdmin(
             userId, includeDeleted=True)
         if not user or user.deletedAt is None:
             # 사용자를 찾을 수 없거나 이미 삭제되지 않은 경우

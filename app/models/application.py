@@ -71,7 +71,7 @@ class Application(Base):
     )
 
     # 1:1 관계
-    api_key = relationship(
+    apiKey = relationship(
         "ApiKey",
         back_populates="application",
         # uselist=False,  # 단일 객체임을 명시

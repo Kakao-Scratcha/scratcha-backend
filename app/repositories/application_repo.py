@@ -14,7 +14,7 @@ class ApplicationRepository:
         self.db = db
 
     #  애플리케이션 생성 CRUD
-    def createpplication(self, userId: int,  appCreate: ApplicationCreate) -> Application:
+    def createApplication(self, userId: int,  appCreate: ApplicationCreate) -> Application:
         """새로운 애플리케이션을 생성합니다."""
 
         # 1. 애플리케이션 객체를 생성합니다.
@@ -43,7 +43,7 @@ class ApplicationRepository:
         return app
 
     # 애플리케이션 조회 CRUD
-    def get_applications_by_user_id(self, userId: int) -> List[Application]:
+    def getApplicationsByUserId(self, userId: int) -> List[Application]:
         """사용자의 모든 애플리케이션을 조회합니다."""
 
         return self.db.query(Application).filter(
@@ -52,7 +52,7 @@ class ApplicationRepository:
         ).all()
 
     # 애플리케이션 갯수 조회 CRUD
-    def get_applications_count_by_user_id(self, userId: int) -> int:
+    def getApplicationsCountByUserId(self, userId: int) -> int:
         """사용자의 애플리케이션 개수를 조회합니다."""
 
         return self.db.query(Application).filter(
@@ -61,7 +61,7 @@ class ApplicationRepository:
         ).count()
 
     # 애플리케이션 단일 조회 CRUD
-    def get_application_by_app_id(self, appId: int) -> Application:
+    def getApplicationByAppId(self, appId: int) -> Application:
         """애플리케이션 ID로 단일 애플리케이션을 조회합니다."""
 
         return self.db.query(Application).filter(
@@ -70,7 +70,7 @@ class ApplicationRepository:
         ).first()
 
     # 애플리케이션 업데이트 CURD
-    def update_application(self, app: Application, appUpdate: ApplicationUpdate) -> Application:
+    def updateApplication(self, app: Application, appUpdate: ApplicationUpdate) -> Application:
         """애플리케이션 정보를 업데이트합니다."""
 
         # 1. 애플리케이션 정보를 업데이트합니다.
@@ -94,10 +94,10 @@ class ApplicationRepository:
         return app
 
     # 애플리케이션 삭제 CRUD
-    def delete_application(self, appId: int) -> Application:
+    def deleteApplication(self, appId: int) -> Application:
         """애플리케이션을 소프트 삭제합니다."""
 
-        app = self.get_application_by_app_id(appId)
+        app = self.getApplicationByAppId(appId)
 
         # 1. 애플리케이션의 삭제 시간을 현재 시간으로 설정합니다.
         app.deletedAt = datetime.now()

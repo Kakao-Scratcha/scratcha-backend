@@ -31,7 +31,7 @@ async def login_for_access_token(
     formData: OAuth2PasswordRequestForm = Depends(),  # OAuth2PasswordRequestForm 사용
     authService: AuthService = Depends(get_auth_service)
 ):
-    user = authService.authenticate_user(formData.username, formData.password)
+    user = authService.authenticateUser(formData.username, formData.password)
 
     if not user:
         raise HTTPException(
@@ -40,6 +40,6 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     # 로그인 성공 시 토큰 생성 및 반환
-    token = authService.create_access_token_for_user(user)
+    token = authService.createAccessTokenForUser(user)
 
     return token

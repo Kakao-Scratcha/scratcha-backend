@@ -7,7 +7,7 @@ from typing import List
 from db.session import get_db
 from app.services.api_key_service import ApiKeyService
 from app.schemas.api_key import ApiKeyResponse
-from app.core.security import get_current_user
+from app.core.security import getCurrentUser
 from app.models.user import User
 
 router = APIRouter(
@@ -29,14 +29,14 @@ def service(db: Session = Depends(get_db)) -> ApiKeyService:
     summary="API 키 생성",
     description="특정 애플리케이션에 대한 API 키를 생성합니다.",
 )
-def create_key(
+def createKey(
     appId: int,  # 애플리케이션 ID
     expiresPolicy: int = 0,  # 만료 정책 (기본값: 0)
-    currentUser: User = Depends(get_current_user),  # 현재 인증된 사용자 정보 가져오기
+    currentUser: User = Depends(getCurrentUser),  # 현재 인증된 사용자 정보 가져오기
     service: ApiKeyService = Depends(service)
 ):
     """특정 애플리케이션에 대한 API 키를 생성합니다."""
-    return service.create_key(currentUser, appId, expiresPolicy)
+    return service.createKey(currentUser, appId, expiresPolicy)
 
 
 @router.get(
@@ -46,12 +46,12 @@ def create_key(
     summary="API 키 목록 조회",
     description="현재 인증된 사용자의 모든 API 키 목록을 조회합니다.",
 )
-def get_keys(
-    currentUser: User = Depends(get_current_user),  # 현재 인증된 사용자 정보 가져오기
+def getKeys(
+    currentUser: User = Depends(getCurrentUser),  # 현재 인증된 사용자 정보 가져오기
     service: ApiKeyService = Depends(service)
 ):
     """현재 인증된 사용자의 모든 API 키를 조회합니다."""
-    return service.get_keys(currentUser)
+    return service.getKeys(currentUser)
 
 
 @router.get(
@@ -61,13 +61,13 @@ def get_keys(
     summary="API 키 단일 조회",
     description="API 키 ID로 단일 API 키를 조회합니다.",
 )
-def get_key(
+def getKey(
     keyId: int,  # API 키 ID
-    currentUser: User = Depends(get_current_user),  # 현재 인증된 사용자 정보 가져오기
+    currentUser: User = Depends(getCurrentUser),  # 현재 인증된 사용자 정보 가져오기
     service: ApiKeyService = Depends(service)
 ):
     """API 키 ID로 단일 API 키를 조회합니다."""
-    return service.get_key(keyId, currentUser)
+    return service.getKey(keyId, currentUser)
 
 
 @router.put(
@@ -77,13 +77,13 @@ def get_key(
     summary="API 키 활성화",
     description="API 키를 활성화합니다.",
 )
-def activate_key(
+def activateKey(
     keyId: int,  # API 키 ID
-    currentUser: User = Depends(get_current_user),  # 현재 인증된 사용자 정보 가져오기
+    currentUser: User = Depends(getCurrentUser),  # 현재 인증된 사용자 정보 가져오기
     service: ApiKeyService = Depends(service)
 ):
     """API 키를 활성화합니다."""
-    return service.activate_key(keyId)
+    return service.activateKey(keyId)
 
 
 @router.put(
@@ -93,13 +93,13 @@ def activate_key(
     summary="API 키 비활성화",
     description="API 키를 비활성화합니다.",
 )
-def deactivate_key(
+def deactivateKey(
     keyId: int,  # API 키 ID
-    currentUser: User = Depends(get_current_user),  # 현재 인증된 사용자 정보 가져오기
+    currentUser: User = Depends(getCurrentUser),  # 현재 인증된 사용자 정보 가져오기
     service: ApiKeyService = Depends(service)
 ):
     """API 키를 비활성화합니다."""
-    return service.deactivate_key(keyId)
+    return service.deactivateKey(keyId)
 
 
 @router.delete(
@@ -109,10 +109,10 @@ def deactivate_key(
     summary="API 키 삭제",
     description="API 키를 소프트 삭제합니다.",
 )
-def delete_key(
+def deleteKey(
     keyId: int,  # API 키 ID
-    currentUser: User = Depends(get_current_user),  # 현재 인증된 사용자 정보 가져오기
+    currentUser: User = Depends(getCurrentUser),  # 현재 인증된 사용자 정보 가져오기
     service: ApiKeyService = Depends(service)
 ):
     """API 키를 소프트 삭제합니다."""
-    return service.delete_key(keyId, currentUser)
+    return service.deleteKey(keyId, currentUser)

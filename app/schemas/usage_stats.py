@@ -1,5 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel
+from typing import List
 
 
 class UsageStatsResponse(BaseModel):
@@ -48,3 +49,21 @@ class ResultsCounts(BaseModel):
     """성공 수, 실패 수 스키마"""
     captchaSuccessCount: int
     captchaFailCount: int
+
+
+class UsageDataLog(BaseModel):
+    """사용량 데이터 로그"""
+    id: int         # 캡챠 로그 ID
+    appName: str    # 앱 이름
+    key: str        # API 키
+    date: datetime  # 캡챠 호출 시간 (=문제 생성 시간)
+    result: str     # 캡챠 결과
+    ratency: int    # 응답시간 (ms)
+
+
+class PaginatedUsageDataLog(BaseModel):
+    """페이지네이션된 사용량 데이터 로그"""
+    items: List[UsageDataLog]   # UsageDataLog를 리스트의 아이템으로 사용
+    total: int                  # 전체 로그 개수
+    page: int                   # 현재 페이지 번호 (skip / limit + 1)
+    size: int                   # 현재 페이지의 항목 개수

@@ -1,8 +1,9 @@
 from datetime import date, timedelta
+from typing import List
 from fastapi import HTTPException, status
 from app.repositories.usage_stats_repo import UsageStatsRepository
 from app.repositories.api_key_repo import ApiKeyRepository
-from app.schemas.usage_stats import ResultsCounts, TotalRequests, WeeklyUsageSummary, MonthlyUsageSummary, DailyUsageSummary
+from app.schemas.usage_stats import ResultsCounts, TotalRequests, WeeklyUsageSummary, MonthlyUsageSummary, DailyUsageSummary, UsageDataLog, PaginatedUsageDataLog
 from app.models.user import User
 
 
@@ -12,7 +13,7 @@ class UsageStatsService:
         self.repo = repo
         self.api_key_repo = api_key_repo
 
-    def _check_api_key_owner(self, apiKeyId: int, currentUser: User):
+    def _checkApiKeyOwner(self, apiKeyId: int, currentUser: User):
         """
         API 키의 소유권을 확인합니다.
 
@@ -26,7 +27,7 @@ class UsageStatsService:
         Raises:
             HTTPException: API 키가 존재하지 않거나 사용자에게 소유권이 없는 경우
         """
-        api_key = self.api_key_repo.get_key_by_key_id(apiKeyId)
+        api_key = self.api_key_repo.getKeyByKeyId(apiKeyId)
         if not api_key or api_key.application.userId != currentUser.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -148,13 +149,53 @@ class UsageStatsService:
             captchaFailCount=fail_count
         )
 
+    def getUsageData(self, currentUser: User, apiKeyId: int = None, skip: int = 0, limit: int = 100) -> PaginatedUsageDataLog:
+        """
+        사용자 또는 API 키별 캡챠 사용량 로그를 조회합니다.
+
+        Args:
+            currentUser (User): 현재 인증된 사용자 객체.
+            apiKeyId (int, optional): API 키의 ID. Defaults to None.
+            skip (int): 건너뛸 레코드 수. Defaults to 0.
+            limit (int): 가져올 최대 레코드 수. Defaults to 100.
+
+        Returns:
+            PaginatedUsageDataLog: 페이지네이션된 사용량 로그 객체.
+        """
+        if apiKeyId:
+            self._checkApiKeyOwner(apiKeyId, currentUser)
+            logs, total_count = self.repo.getUsageDataLogs(
+                apiKeyId=apiKeyId, skip=skip, limit=limit)
+        else:
+            logs, total_count = self.repo.getUsageDataLogs(
+                userId=currentUser.id, skip=skip, limit=limit)
+
+        items = [
+            UsageDataLog(
+                id=log[0],
+                appName=log[1],
+                key=log[2],
+                date=log[3],
+                result=log[4],
+                ratency=log[5]
+            )
+            for log in logs
+        ]
+
+        return PaginatedUsageDataLog(
+            items=items,                # UsageDataLog를 리스트의 아이템으로 사용
+            total=total_count,          # 전체 로그 개수
+            page=skip // limit + 1,     # # 현재 페이지 번호 (skip / limit + 1)
+            size=len(items)             # 현재 페이지의 항목 개수
+        )
+
     # --- API 키 기준 통계 --- #
 
     def getWeeklySummaryByApiKey(self, apiKeyId: int, currentUser: User) -> WeeklyUsageSummary:
         """
         API 키 기준: 이번 주와 지난주의 사용량 요약을 반환합니다.
         """
-        self._check_api_key_owner(apiKeyId, currentUser)
+        self._checkApiKeyOwner(apiKeyId, currentUser)
         today = date.today()
         weekdayOffset = today.weekday() + 1
         if weekdayOffset == 7:
@@ -191,7 +232,7 @@ class UsageStatsService:
         """
         API 키 기준: 이번 달과 지난달의 사용량 요약을 반환합니다.
         """
-        self._check_api_key_owner(apiKeyId, currentUser)
+        self._checkApiKeyOwner(apiKeyId, currentUser)
         today = date.today()
         thisMonthStartDate = today.replace(day=1)
         thisMonthEndDate = today
@@ -225,7 +266,7 @@ class UsageStatsService:
         """
         API 키 기준: 오늘과 어제의 사용량 요약을 반환합니다.
         """
-        self._check_api_key_owner(apiKeyId, currentUser)
+        self._checkApiKeyOwner(apiKeyId, currentUser)
         today = date.today()
         yesterday = today - timedelta(days=1)
 
@@ -254,7 +295,7 @@ class UsageStatsService:
         """
         API 키 기준: 전체 캡챠 요청 수를 조회합니다.
         """
-        self._check_api_key_owner(apiKeyId, currentUser)
+        self._checkApiKeyOwner(apiKeyId, currentUser)
         total_requests_count = self.repo.getTotalRequestsByApiKey(apiKeyId)
         return TotalRequests(totalRequests=total_requests_count)
 
@@ -262,7 +303,7 @@ class UsageStatsService:
         """
         API 키 기준: 전체 캡챠 성공 및 실패 수를 조회합니다.
         """
-        self._check_api_key_owner(apiKeyId, currentUser)
+        self._checkApiKeyOwner(apiKeyId, currentUser)
         success_count, fail_count = self.repo.getResultsCountsByApiKey(
             apiKeyId)
         return ResultsCounts(

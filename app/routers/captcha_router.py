@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 
 # 프로젝트 의존성 및 모델, 서비스 임포트
-from app.core.security import get_valid_api_key
+from app.core.security import getValidApiKey
 from app.models.api_key import ApiKey
 from db.session import get_db
 from app.schemas.captcha import CaptchaProblemResponse
@@ -26,10 +26,10 @@ router = APIRouter(
     summary="캡챠 문제 생성",
     description="유효한 API 키로 호출하면 새로운 캡챠 문제와 세션 토큰을 반환합니다."
 )
-def get_captcha_problem(
+def getCaptchaProblem(
     # 'x-api-key' 헤더를 통해 전달된 유효한 API 키 객체
-    apiKey: ApiKey = Depends(get_valid_api_key),
+    apiKey: ApiKey = Depends(getValidApiKey),
     db: Session = Depends(get_db)
 ):
     service = CaptchaService(db)
-    return service.generate_captcha_problem(apiKey)
+    return service.generateCaptchaProblem(apiKey)

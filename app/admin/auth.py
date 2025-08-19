@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from db.session import SessionLocal
 from app.models.user import User, UserRole
-from app.core.security import verify_password
+from app.core.security import verifyPassword
 
 
 class AdminAuth(AuthenticationBackend):
@@ -30,7 +30,7 @@ class AdminAuth(AuthenticationBackend):
             db.close()  # 세션 사용 후 반드시 닫아줍니다.
 
         # 사용자 존재 여부, 역할, 비밀번호를 확인합니다.
-        if user and user.role == UserRole.ADMIN and verify_password(password, user.passwordHash):
+        if user and user.role == UserRole.ADMIN and verifyPassword(password, user.passwordHash):
             # 인증 성공 시, 세션에 사용자 ID와 이메일을 저장합니다.
             request.session.update(
                 {"user_id": user.id, "user_email": user.email})

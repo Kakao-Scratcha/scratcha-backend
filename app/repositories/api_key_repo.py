@@ -16,7 +16,7 @@ class ApiKeyRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_key(self, userId: int, appId: int, expiresPolicy: int = 0) -> ApiKey:
+    def createKey(self, userId: int, appId: int, expiresPolicy: int = 0) -> ApiKey:
         """특정 애플리케이션에 대한 API 키를 새로 생성합니다."""
         # 1. 대상 애플리케이션을 조회합니다.
         application = self.db.query(Application).filter(
@@ -28,7 +28,7 @@ class ApiKeyRepository:
             )
 
         # 2. 현재 활성화된 키가 있다면 에러를 반환합니다.
-        if self.get_key_by_app_id(appId):
+        if self.getKeyByAppId(appId):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="이미 해당 애플리케이션에 대한 활성화된 API 키가 존재합니다."
@@ -64,31 +64,7 @@ class ApiKeyRepository:
 
         return new_key
 
-    # def delete_key(self, appId: int):
-    #     """
-    #     애플리케이션에 연결된 API 키를 삭제(soft-delete)합니다.
-    #     """
-    #     key = self.db.query(ApiKey).filter(
-    #         ApiKey.appId == appId, ApiKey.deletedAt.is_(None)).first()
-    #     if not key:
-    #         raise HTTPException(
-    #             status_code=status.HTTP_404_NOT_FOUND,
-    #             detail="해당 애플리케이션에 연결된 API 키가 없습니다."
-    #         )
-
-    #     try:
-    #         key.isActive = False
-    #         key.deletedAt = datetime.now()
-    #         self.db.commit()
-    #         self.db.refresh(key)
-    #     except Exception:
-    #         self.db.rollback()
-    #         raise HTTPException(
-    #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #             detail="API 키 삭제 중 오류가 발생했습니다."
-    #         )
-
-    def delete_key(self, appId: int):
+    def deleteKeyByAppId(self, appId: int):
         """애플리케이션에 연결된 활성 API 키를 비활성화(soft-delete)합니다."""
         key = self.db.query(ApiKey).filter(
             ApiKey.appId == appId,
@@ -112,7 +88,7 @@ class ApiKeyRepository:
                 detail="API 키 삭제 중 오류가 발생했습니다."
             )
 
-    def get_keys_by_user_id(self, userId) -> List[ApiKey]:
+    def getKeysByUserId(self, userId) -> List[ApiKey]:
         """유저의 모든 API 키를 조회합니다."""
 
         return self.db.query(ApiKey).filter(
@@ -120,16 +96,7 @@ class ApiKeyRepository:
             ApiKey.deletedAt.is_(None)
         ).all()
 
-    # def get_key_by_app_id(self, appId: int) -> Optional[ApiKey]:
-    #     """특정 애플리케이션에 대한 API 키를 조회합니다."""
-
-    #     return self.db.query(ApiKey).filter(
-    #         ApiKey.appId == appId,
-    #         ApiKey.deletedAt.is_(None),
-    #         ApiKey.isActive == True
-    #     ).first()
-
-    def get_key_by_app_id(self, appId: int) -> Optional[ApiKey]:
+    def getKeyByAppId(self, appId: int) -> Optional[ApiKey]:
         """
         주어진 appId에 해당하는 현재 활성화된 API 키를 조회합니다.
         가장 최근에 생성된 활성화 키를 반환합니다.
@@ -142,7 +109,7 @@ class ApiKeyRepository:
             )
         ).order_by(ApiKey.createdAt.desc()).first()
 
-    def get_key_by_key_id(self, keyId: int) -> Optional[ApiKey]:
+    def getKeyByKeyId(self, keyId: int) -> Optional[ApiKey]:
         """API 키 ID로 단일 API 키를 조회합니다."""
 
         return self.db.query(ApiKey).filter(
@@ -150,10 +117,10 @@ class ApiKeyRepository:
             ApiKey.deletedAt.is_(None)
         ).first()
 
-    def delete_key(self, keyId: int) -> Optional[ApiKey]:
+    def deleteKey(self, keyId: int) -> Optional[ApiKey]:
         """API 키를 소프트 삭제합니다."""
 
-        key = self.get_key_by_key_id(keyId)
+        key = self.getKeyByKeyId(keyId)
         if not key:
             return None
 
@@ -173,10 +140,10 @@ class ApiKeyRepository:
 
         return key
 
-    def activate_key(self, keyId: int) -> Optional[ApiKey]:
+    def activateKey(self, keyId: int) -> Optional[ApiKey]:
         """API 키를 활성화합니다."""
 
-        key = self.get_key_by_key_id(keyId)
+        key = self.getKeyByKeyId(keyId)
         if not key:
             return None
         key.isActive = True
@@ -194,10 +161,10 @@ class ApiKeyRepository:
 
         return key
 
-    def deactivate_key(self, keyId: int) -> Optional[ApiKey]:
+    def deactivateKey(self, keyId: int) -> Optional[ApiKey]:
         """API 키를 비활성화합니다."""
 
-        key = self.get_key_by_key_id(keyId)
+        key = self.getKeyByKeyId(keyId)
         if not key:
             return None
         key.isActive = False
@@ -215,7 +182,7 @@ class ApiKeyRepository:
 
         return key
 
-    def get_active_api_key_by_target_key(self, targetKey: str) -> Optional[ApiKey]:
+    def getActiveApiKeyByTargetKey(self, targetKey: str) -> Optional[ApiKey]:
         """해당 키가 DB에 저장되어있는지 조회하고 유효한 키인지 검증합니다."""
 
         return self.db.query(ApiKey).filter(

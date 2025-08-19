@@ -60,4 +60,4 @@ class UsageStats(Base):
     )
 
     # 관계 설정 (API 키 객체를 역방향으로 참조)
-    api_key = relationship("ApiKey", back_populates="usage_stats")
+    apiKey = relationship("ApiKey", back_populates="usageStats")
