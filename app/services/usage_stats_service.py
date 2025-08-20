@@ -31,7 +31,7 @@ class UsageStatsService:
         if not api_key or api_key.application.userId != currentUser.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to access this API key."
+                detail="이 API 키에 접근할 권한이 없습니다."
             )
 
     def getDailySummary(self, userId: int) -> DailyUsageSummary:

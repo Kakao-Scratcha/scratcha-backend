@@ -9,6 +9,12 @@ from app.models.user import User
 from app.repositories.user_repo import UserRepository
 from app.schemas.token import Token
 
+# Custom Exceptions
+class UserNotFoundException(Exception):
+    pass
+
+class InvalidPasswordException(Exception):
+    pass
 
 # 인증(Authentication) 관련 비즈니스 로직을 처리하는 서비스 클래스입니다.
 # 사용자 인증, JWT 토큰 생성 등의 기능을 제공합니다.
@@ -18,20 +24,20 @@ class AuthService:
     def __init__(self, db: Session):
         self.userRepo = UserRepository(db)
 
-    def authenticateUser(self, email: str, password: str) -> Optional[User]:
+    def authenticateUser(self, email: str, password: str) -> User:
 
         # 1. 이메일을 사용하여 데이터베이스에서 사용자를 조회합니다.
         user = self.userRepo.getUserByEmail(email)
 
-        # 2. 사용자 존재 여부 및 비밀번호 일치 여부를 확인합니다.
-        #      user가 None이거나 (사용자가 없거나)
-        #      security 모듈의 verifyPassword 함수를 통해 평문 비밀번호와
-        #      데이터베이스에 저장된 해시된 비밀번호가 일치하지 않으면
-        #      인증에 실패한 것으로 간주합니다.
-        if not user or not security.verifyPassword(password, user.passwordHash):
-            return None
+        # 2. 사용자 존재 여부를 확인합니다.
+        if not user:
+            raise UserNotFoundException()
 
-        # 3. 인증에 성공하면 사용자 객체를 반환합니다.
+        # 3. 비밀번호 일치 여부를 확인합니다.
+        if not security.verifyPassword(password, user.passwordHash):
+            raise InvalidPasswordException()
+
+        # 4. 인증에 성공하면 사용자 객체를 반환합니다.
         return user
 
     # 인증된 사용자에게 JWT 액세스 토큰을 생성하여 반환합니다.
