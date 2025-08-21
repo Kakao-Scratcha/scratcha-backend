@@ -25,14 +25,11 @@ class CaptchaRepository:
         return random.choice(validProblems)
 
     def createCaptchaSession(self, apiKeyId: int, captchaProblemId: int, clientToken: str) -> CaptchaSession:
-        """새로운 캡챠 세션을 생성하고 DB에 저장합니다."""
+        """새로운 캡챠 세션을 생성합니다. (커밋하지 않음)"""
         captchaSession = CaptchaSession(
             apiKeyId=apiKeyId,
             captchaProblemId=captchaProblemId,
             clientToken=clientToken
         )
         self.db.add(captchaSession)
-        self.db.commit()
-        self.db.refresh(captchaSession)
-
         return captchaSession
