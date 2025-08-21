@@ -44,7 +44,7 @@ class CaptchaService:
             # 3. 캡챠 세션을 생성합니다. (커밋 없음)
             clientToken = str(uuid.uuid4())
             session = self.captchaRepo.createCaptchaSession(
-                apiKeyId=apiKey.id,
+                keyId=apiKey.id,
                 captchaProblemId=selectedProblem.id,
                 clientToken=clientToken
             )

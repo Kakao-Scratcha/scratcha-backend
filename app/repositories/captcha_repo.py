@@ -24,10 +24,10 @@ class CaptchaRepository:
 
         return random.choice(validProblems)
 
-    def createCaptchaSession(self, apiKeyId: int, captchaProblemId: int, clientToken: str) -> CaptchaSession:
+    def createCaptchaSession(self, keyId: int, captchaProblemId: int, clientToken: str) -> CaptchaSession:
         """새로운 캡챠 세션을 생성합니다. (커밋하지 않음)"""
         captchaSession = CaptchaSession(
-            apiKeyId=apiKeyId,
+            keyId=keyId,
             captchaProblemId=captchaProblemId,
             clientToken=clientToken
         )

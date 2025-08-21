@@ -23,7 +23,7 @@ class CaptchaLog(Base):
         autoincrement=True,
         comment="캡챠 로그 ID"
     )
-    apiKeyId = Column(
+    keyId = Column(
         "api_key_id",
         Integer,
         ForeignKey("api_key.id"),

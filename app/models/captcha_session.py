@@ -16,7 +16,7 @@ class CaptchaSession(Base):
         comment="캡챠 세션 ID"
     )
 
-    apiKeyId = Column(
+    keyId = Column(
         "api_key_id",
         Integer,
         ForeignKey("api_key.id"),

@@ -38,7 +38,7 @@ class UsageStatsRepository:
             func.sum(UsageStats.captchaFailCount).label(
                 'captchaFailCount'),
         ).join(
-            ApiKey, UsageStats.apiKeyId == ApiKey.id
+            ApiKey, UsageStats.keyId == ApiKey.id
         ).join(
             Application, ApiKey.appId == Application.id
         ).filter(
@@ -70,7 +70,7 @@ class UsageStatsRepository:
             func.sum(UsageStats.captchaSuccessCount),
             func.sum(UsageStats.captchaFailCount)
         ).join(
-            ApiKey, UsageStats.apiKeyId == ApiKey.id
+            ApiKey, UsageStats.keyId == ApiKey.id
         ).join(
             Application, ApiKey.appId == Application.id
         ).filter(
@@ -98,7 +98,7 @@ class UsageStatsRepository:
         result = self.db.query(
             func.sum(UsageStats.captchaTotalRequests)
         ).join(
-            ApiKey, UsageStats.apiKeyId == ApiKey.id
+            ApiKey, UsageStats.keyId == ApiKey.id
         ).join(
             Application, ApiKey.appId == Application.id
         ).filter(
@@ -121,7 +121,7 @@ class UsageStatsRepository:
             func.sum(UsageStats.captchaSuccessCount),
             func.sum(UsageStats.captchaFailCount)
         ).join(
-            ApiKey, UsageStats.apiKeyId == ApiKey.id
+            ApiKey, UsageStats.keyId == ApiKey.id
         ).join(
             Application, ApiKey.appId == Application.id
         ).filter(
@@ -135,12 +135,12 @@ class UsageStatsRepository:
 
     # --- API 키 기준 통계 --- #
 
-    def getSummaryForPeriodByApiKey(self, apiKeyId: int, startDate: date, endDate: date) -> tuple[int, int, int]:
+    def getSummaryForPeriodByApiKey(self, keyId: int, startDate: date, endDate: date) -> tuple[int, int, int]:
         """
         특정 API 키와 날짜 범위에 대한 총 요청 수, 성공 수, 실패 수를 반환합니다.
 
         Args:
-            apiKeyId (int): API 키의 ID.
+            keyId (int): API 키의 ID.
             startDate (date): 조회 시작 날짜.
             endDate (date): 조회 종료 날짜.
 
@@ -152,7 +152,7 @@ class UsageStatsRepository:
             func.sum(UsageStats.captchaSuccessCount),
             func.sum(UsageStats.captchaFailCount)
         ).filter(
-            UsageStats.apiKeyId == apiKeyId,
+            UsageStats.keyId == keyId,
             UsageStats.date >= startDate,
             UsageStats.date <= endDate
         ).first()
@@ -176,7 +176,7 @@ class UsageStatsRepository:
         result = self.db.query(
             func.sum(UsageStats.captchaTotalRequests)
         ).filter(
-            UsageStats.apiKeyId == keyId
+            UsageStats.keyId == keyId
         ).scalar()
 
         return result if result is not None else 0
@@ -195,7 +195,7 @@ class UsageStatsRepository:
             func.sum(UsageStats.captchaSuccessCount),
             func.sum(UsageStats.captchaFailCount)
         ).filter(
-            UsageStats.apiKeyId == keyId
+            UsageStats.keyId == keyId
         ).first()
 
         success_count = result[0] if result and result[0] is not None else 0
@@ -203,13 +203,13 @@ class UsageStatsRepository:
 
         return success_count, fail_count
 
-    def getUsageDataLogs(self, userId: int = None, apiKeyId: int = None, skip: int = 0, limit: int = 100) -> tuple[list, int]:
+    def getUsageDataLogs(self, userId: int = None, keyId: int = None, skip: int = 0, limit: int = 100) -> tuple[list, int]:
         """
         사용자 또는 API 키별 캡챠 사용량 로그를 조회합니다.
 
         Args:
             userId (int, optional): 사용자의 ID. Defaults to None.
-            apiKeyId (int, optional): API 키의 ID. Defaults to None.
+            keyId (int, optional): API 키의 ID. Defaults to None.
             skip (int): 건너뛸 레코드 수. Defaults to 0.
             limit (int): 가져올 최대 레코드 수. Defaults to 100.
 
@@ -224,15 +224,15 @@ class UsageStatsRepository:
             CaptchaLog.result,
             CaptchaLog.latency_ms
         ).join(
-            ApiKey, CaptchaLog.apiKeyId == ApiKey.id
+            ApiKey, CaptchaLog.keyId == ApiKey.id
         ).join(
             Application, ApiKey.appId == Application.id
         )
 
         if userId:
             base_query = base_query.filter(Application.userId == userId)
-        if apiKeyId:
-            base_query = base_query.filter(ApiKey.id == apiKeyId)
+        if keyId:
+            base_query = base_query.filter(ApiKey.id == keyId)
 
         total_count = base_query.count()
         logs = base_query.offset(skip).limit(limit).all()

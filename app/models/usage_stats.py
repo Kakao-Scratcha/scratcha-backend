@@ -17,7 +17,7 @@ class UsageStats(Base):
         autoincrement=True,
         comment="사용량 통계 ID"
     )
-    apiKeyId = Column(
+    keyId = Column(
         "api_key_id",
         Integer,
         ForeignKey("api_key.id"),
