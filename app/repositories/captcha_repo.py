@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
 import random
+from fastapi import HTTPException, status
 
 from app.models.captcha_problem import CaptchaProblem
 from app.models.captcha_session import CaptchaSession
@@ -11,25 +12,67 @@ from app.models.captcha_session import CaptchaSession
 
 class CaptchaRepository:
     def __init__(self, db: Session):
+        """
+        CaptchaRepository의 생성자입니다.
+
+        Args:
+            db (Session): SQLAlchemy 데이터베이스 세션.
+        """
         self.db = db
 
     def getRandomActiveProblem(self) -> Optional[CaptchaProblem]:
-        """활성화된 캡챠 문제 중 하나를 무작위로 선택합니다."""
-        validProblems = self.db.query(CaptchaProblem).filter(
-            CaptchaProblem.expiresAt > func.now()
-        ).all()
+        """
+        데이터베이스에서 활성화된 (만료되지 않은) 캡챠 문제 중 하나를 무작위로 선택하여 반환합니다.
 
+        Returns:
+            Optional[CaptchaProblem]: 무작위로 선택된 활성 CaptchaProblem 객체. 활성 문제가 없으면 None을 반환합니다.
+        """
+        try:
+            # 1. 현재 시간을 기준으로 아직 만료되지 않은 모든 캡챠 문제를 데이터베이스에서 조회합니다.
+            validProblems = self.db.query(CaptchaProblem).filter(
+                CaptchaProblem.expiresAt > func.now()
+            ).all()
+        except Exception as e:
+            # 2. 데이터베이스 조회 중 오류가 발생하면 서버 오류를 발생시킵니다.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"캡챠 문제 조회 중 오류가 발생했습니다: {e}"
+            )
+
+        # 3. 유효한 문제가 없는 경우, None을 반환합니다.
         if not validProblems:
             return None
 
+        # 4. 조회된 유효한 문제 목록에서 무작위로 하나를 선택하여 반환합니다.
         return random.choice(validProblems)
 
     def createCaptchaSession(self, keyId: int, captchaProblemId: int, clientToken: str) -> CaptchaSession:
-        """새로운 캡챠 세션을 생성합니다. (커밋하지 않음)"""
-        captchaSession = CaptchaSession(
-            keyId=keyId,
-            captchaProblemId=captchaProblemId,
-            clientToken=clientToken
-        )
-        self.db.add(captchaSession)
-        return captchaSession
+        """
+        새로운 캡챠 세션을 생성하고 데이터베이스 세션에 추가합니다.
+        이 메소드는 세션에 객체를 추가할 뿐, 커밋(commit)은 직접 수행하지 않습니다.
+
+        Args:
+            keyId (int): 이 세션을 요청한 API 키의 ID.
+            captchaProblemId (int): 사용자에게 제시된 캡챠 문제의 ID.
+            clientToken (str): 이 세션을 식별하는 고유 클라이언트 토큰.
+
+        Returns:
+            CaptchaSession: 새로 생성된 CaptchaSession 객체.
+        """
+        try:
+            # 1. 주어진 인자들로 새로운 CaptchaSession 모델 객체를 생성합니다.
+            captchaSession = CaptchaSession(
+                keyId=keyId,
+                captchaProblemId=captchaProblemId,
+                clientToken=clientToken
+            )
+            # 2. 생성된 객체를 데이터베이스 세션에 추가합니다.
+            self.db.add(captchaSession)
+            # 3. 추가된 객체를 반환합니다. (호출한 쪽에서 커밋 필요)
+            return captchaSession
+        except Exception as e:
+            # 4. 세션 추가 중 오류가 발생하면 서버 오류를 발생시킵니다.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"캡챠 세션 생성 중 오류가 발생했습니다: {e}"
+            )
