@@ -1,8 +1,11 @@
-
-
-from app.models.api_key import AppApiKey
-from app.models.application import Application
 from app.models.user import User
+from app.models.application import Application
+from app.models.api_key import ApiKey
+from app.models.captcha_problem import CaptchaProblem
+from app.models.captcha_session import CaptchaSession
+from app.models.captcha_log import CaptchaLog
+from app.models.usage_stats import UsageStats
+
 from db.base import Base
 from logging.config import fileConfig
 

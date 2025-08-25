@@ -1,9 +1,11 @@
 # db/session.py
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
 import os
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from sqlalchemy.orm import sessionmaker
+from typing import Generator
+
 
 load_dotenv()
 
@@ -20,3 +22,15 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 # 세션 로컬 클래스 생성
 # 이 클래스의 인스턴스가 실제 데이터베이스 세션이 됩니다.
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db() -> Generator:
+    """
+    SQLAlchemy 세션을 생성하고, 요청이 끝나면 안전하게 반환합니다.
+    FastAPI Depends(get_db)로 사용.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

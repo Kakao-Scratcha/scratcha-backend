@@ -1,44 +1,51 @@
 # backend/models/application.py
 
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from db.base import Base
 
 
 class Application(Base):
-    __tablename__ = "user_applications"
+    __tablename__ = "application"
 
     id = Column(
         Integer,
         primary_key=True,
-        autoincrement=True
+        autoincrement=True,
+        comment="앱 ID"
     )
 
     userId = Column(
         "user_id",
         Integer,
-        ForeignKey("auth_users.id"),
-        nullable=False
+        # User가 삭제될 때 이 레코드도 함께 삭제되도록 합니다.
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="사용자 FK"
     )
 
     appName = Column(
         "app_name",
         String(100),
-        nullable=False
+        nullable=False,
+        comment="앱 이름"
     )
 
     description = Column(
+        "description",
         Text,
-        nullable=True
+        nullable=True,
+        comment="앱 설명"
     )
 
     createdAt = Column(
         "created_at",
         DateTime,
         server_default=func.now(),
-        nullable=False
+        nullable=False,
+        comment="생성 시각"
     )
 
     updatedAt = Column(
@@ -46,18 +53,27 @@ class Application(Base):
         DateTime,
         server_default=func.now(),
         onupdate=func.now(),
-        nullable=False
+        nullable=False,
+        comment="수정 시각"
     )
 
     deletedAt = Column(
         "deleted_at",
         DateTime,
-        nullable=True
+        nullable=True,
+        comment="삭제 시각 (soft-delete)"
     )
 
-    user = relationship("User", back_populates="applications")
-    api_keys = relationship(
-        "AppApiKey", back_populates="application", cascade="all, delete-orphan")
+    # N:1 관계
+    user = relationship(
+        "User",
+        back_populates="application"
+    )
 
-    def __repr__(self):
-        return f"<Application(id={self.id}, appName='{self.appName}', userId='{self.userId}')>"
+    # 1:1 관계
+    apiKey = relationship(
+        "ApiKey",
+        back_populates="application",
+        # uselist=False,  # 단일 객체임을 명시
+        cascade="all, delete-orphan"
+    )

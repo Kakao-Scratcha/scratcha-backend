@@ -1,173 +1,184 @@
-# backend/routers/users.py
+# app/routers/users_router.py
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from typing import List
 
-from .deps_router import get_db
-from ..schemas.user import UserCreate, UserResponse, UserUpdate
-from ..services.user_service import UserService
-from ..core.security import get_current_user, get_current_admin_user
-from ..models.user import User
+from db.session import get_db
+from app.schemas.user import UserCreate, UserResponse, UserUpdate, UserPlanUpdate
+from app.services.user_service import UserService
+from app.core.security import getCurrentUser
+from app.models.user import User
 
 router = APIRouter(
     prefix="/users",
-    tags=["users"],
+    tags=["Users"],
     responses={404: {"description": "Not found"}},
 )
 
-# get_user_service 의존성 함수 (서비스 객체 생성 및 주입)
 
+def getUserService(db: Session = Depends(get_db)) -> UserService:
+    """
+    FastAPI 의존성 주입을 통해 UserService 인스턴스를 생성하고 반환합니다.
 
-def get_user_service(db: Session = Depends(get_db)) -> UserService:
+    Args:
+        db (Session, optional): `get_db` 의존성에서 제공하는 데이터베이스 세션.
+
+    Returns:
+        UserService: UserService의 인스턴스.
+    """
     return UserService(db)
 
 
-@router.post(  # 사용자 회원가입
+@router.post(
     "/signup",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="회원 가입",
+    summary="새로운 사용자 회원가입",
     description="이메일, 비밀번호, 이름으로 새로운 사용자 계정을 생성합니다.",
 )
-def signup_user(
-    user: UserCreate,
-    userService: UserService = Depends(get_user_service)
+def signupUser(
+    userCreate: UserCreate,
+    userService: UserService = Depends(getUserService)
 ):
-    newUser = userService.create_user(user)
+    """
+    새로운 사용자 계정을 생성합니다.
 
+    Args:
+        userCreate (UserCreate): 생성할 사용자의 데이터 (이메일, 비밀번호, 이름).
+        userService (UserService): 의존성으로 주입된 사용자 서비스 객체.
+
+    Returns:
+        UserResponse: 생성된 사용자의 상세 정보.
+    """
+    # 1. 사용자 서비스의 계정 생성 메서드를 호출합니다.
+    newUser = userService.createUser(userCreate)
+
+    # 2. 사용자 생성에 실패(예: 이미 존재하는 이메일)한 경우, 409 Conflict 오류를 발생시킵니다.
     if newUser is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 존재하는 이메일입니다."
         )
 
+    # 3. 생성된 사용자 정보를 반환합니다.
     return newUser
 
 
-@router.get(  # 사용자 정보 조회
-
+@router.get(
     "/me",
     response_model=UserResponse,
     status_code=status.HTTP_200_OK,
-    summary="내 정보 조회",
-    description="현재 로그인된 사용자의 정보를 조회합니다."
+    summary="현재 로그인된 사용자 정보 조회",
+    description="현재 인증된(로그인된) 사용자의 상세 정보를 조회합니다."
 )
-def get_user(
-    currnetUser: User = Depends(get_current_user),  # get_current_user 의존성 사용
+def getUser(
+    currentUser: User = Depends(getCurrentUser),
 ):
-    return currnetUser
+    """
+    현재 인증된 사용자의 정보를 조회합니다.
+
+    Args:
+        currentUser (User): `getCurrentUser` 의존성으로 주입된 현재 인증된 사용자 객체.
+
+    Returns:
+        UserResponse: 현재 사용자의 상세 정보.
+    """
+    # 1. `getCurrentUser` 의존성을 통해 이미 인증된 사용자 객체가 주입되므로, 해당 객체를 바로 반환합니다.
+    return currentUser
 
 
-@router.patch(  # 사용자 정보 업데이트
-    "/me",  # PATCH: 부분 업데이트에 적합
+@router.patch(
+    "/me",
     response_model=UserResponse,
     status_code=status.HTTP_200_OK,
-    summary="내 정보 업데이트",
-    description="현재 로그인된 사용자의 정보를 업데이트합니다."
+    summary="현재 로그인된 사용자 정보 업데이트",
+    description="현재 인증된(로그인된) 사용자의 정보를 부분적으로 업데이트합니다."
 )
-def update_user(
+def updateUser(
     userUpdate: UserUpdate,
-    currnetUser: User = Depends(get_current_user),
-    userService: UserService = Depends(get_user_service)
+    currentUser: User = Depends(getCurrentUser),
+    userService: UserService = Depends(getUserService)
 
 ):
-    updatedUser = userService.update_user(currnetUser.id, userUpdate)
+    """
+    현재 인증된 사용자의 정보를 업데이트합니다.
+
+    Args:
+        userUpdate (UserUpdate): 업데이트할 사용자 정보 (스키마).
+        currentUser (User): `getCurrentUser` 의존성으로 주입된 현재 인증된 사용자 객체.
+        userService (UserService): 의존성으로 주입된 사용자 서비스 객체.
+
+    Returns:
+        UserResponse: 업데이트된 사용자의 상세 정보.
+    """
+    # 1. 사용자 서비스의 정보 업데이트 메서드를 호출합니다.
+    updatedUser = userService.updateUser(currentUser.id, userUpdate)
+    # 2. 업데이트된 사용자 정보를 반환합니다.
     return updatedUser
 
 
-@router.delete(  # 사용자 삭제
+@router.delete(
     "/me",
     response_model=UserResponse,
     status_code=status.HTTP_200_OK,
     summary="회원 탈퇴 (계정 소프트 삭제)",
-    description="현재 로그인된 사용자 계정을 소프트 삭제합니다. 계정은 비활성화 됩니다."
+    description="현재 로그인된 사용자 계정을 소프트 삭제(비활성화) 처리합니다."
 )
-def delete_user(
-    currentUser: User = Depends(get_current_user),  # 인증된(JWT) 사용자인지 확인
-    userService: UserService = Depends(get_user_service)
+def deleteUser(
+    currentUser: User = Depends(getCurrentUser),
+    userService: UserService = Depends(getUserService)
 ):
-    deletedUser = userService.delete_user(currentUser.id)
+    """
+    현재 인증된 사용자 계정을 소프트 삭제합니다.
 
+    Args:
+        currentUser (User): `getCurrentUser` 의존성으로 주입된 현재 인증된 사용자 객체.
+        userService (UserService): 의존성으로 주입된 사용자 서비스 객체.
+
+    Returns:
+        UserResponse: 소프트 삭제 처리된 사용자의 상세 정보.
+    """
+    # 1. 사용자 서비스의 계정 삭제 메서드를 호출합니다.
+    deletedUser = userService.deleteUser(currentUser.id)
+
+    # 2. 삭제할 사용자를 찾을 수 없는 경우 (예: 이미 삭제되었거나 존재하지 않는 경우), 404 Not Found 오류를 발생시킵니다.
     if not deletedUser:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="사용자를 찾을 수 없습니다."
         )
 
+    # 3. 삭제 처리된 사용자 정보를 반환합니다.
     return deletedUser
 
 
-# --- 관리자 전용 API 엔드포인트 추가 ---
-@router.get(
-    "/admin/all",
-    response_model=List[UserResponse],  # 여러 UserResponse 객체를 리스트로 반환
-    summary="[관리자] 모든 사용자 조회",
-    description="관리자 권한으로 모든 사용자 계정 목록을 조회합니다 (소프트 삭제된 사용자 포함 여부 선택 가능).",
-)
-def admin_get_all_users(
-    include_deleted: bool = False,  # 쿼리 파라미터로 소프트 삭제 사용자 포함 여부 선택
-    adminUser: User = Depends(get_current_admin_user),
-    userService: UserService = Depends(get_user_service)
-):
-    users = userService.get_all_users_admin(include_deleted)
-    return users
-
-
-@router.get(
-    "/admin/{userId}",
+@router.patch(
+    "/{userId}/plan",
     response_model=UserResponse,
-    summary="[관리자] 특정 사용자 조회",
-    description="관리자 권한으로 특정 사용자 계정 정보를 조회합니다 (소프트 삭제된 사용자 포함 여부 선택 가능).",
+    status_code=status.HTTP_200_OK,
+    summary="사용자 플랜 업데이트",
+    description="특정 사용자의 구독 플랜을 업데이트합니다. (관리자 또는 해당 사용자만 가능)",
 )
-def admin_get_user_by_id(
-    userId: str,
-    include_deleted: bool = False,
-    adminUser: User = Depends(get_current_admin_user),
-    userService: UserService = Depends(get_user_service)
+def updateUserPlan(
+    userId: int,
+    planUpdate: UserPlanUpdate,
+    currentUser: User = Depends(getCurrentUser),
+    userService: UserService = Depends(getUserService)
 ):
-    user = userService.get_user_admin(userId, include_deleted)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
-    return user
+    """
+    특정 사용자의 구독 플랜을 업데이트합니다.
 
+    Args:
+        userId (int): 플랜을 업데이트할 사용자의 ID.
+        planUpdate (UserPlanUpdate): 업데이트할 구독 플랜 정보 (스키마).
+        currentUser (User): `getCurrentUser` 의존성으로 주입된 현재 인증된 사용자 객체.
+        userService: UserService = Depends(getUserService)
 
-@router.post(
-    "/admin/{userId}/restore",
-    response_model=UserResponse,
-    summary="[관리자] 특정 사용자 계정 복구",
-    description="관리자 권한으로 소프트 삭제된 사용자 계정을 복구합니다.",
-)
-def admin_restore_user(
-    userId: str,
-    adminUser: User = Depends(get_current_admin_user),
-    userService: UserService = Depends(get_user_service)
-):
-    restoredUser = userService.restore_user_admin(userId)
-    if not restoredUser:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="계정을 복구할 수 없습니다. 사용자를 찾을 수 없거나 삭제된 계정이 아닙니다."
-        )
-    return restoredUser
-
-
-@router.delete(
-    "/admin/{userId}",
-    response_model=UserResponse,
-    summary="[관리자] 특정 사용자 계정 소프트 삭제",
-    description="관리자 권한으로 특정 사용자 계정을 소프트 삭제합니다.",
-)
-def admin_delete_user(
-    userId: str,
-    adminUser: User = Depends(get_current_admin_user),
-    userService: UserService = Depends(get_user_service)
-):
-    deletedUser = userService.delete_user(userId)
-    if not deletedUser:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="사용자 계정을 삭제할 수 없습니다. 이미 삭제되었거나 사용자를 찾을 수 없습니다."
-        )
-    return deletedUser
+    Returns:
+        UserResponse: 플랜이 업데이트된 사용자의 상세 정보.
+    """
+    # 1. 사용자 서비스의 구독 플랜 업데이트 메서드를 호출합니다.
+    updatedUser = userService.updateUserPlan(userId, planUpdate, currentUser)
+    # 2. 업데이트된 사용자 정보를 반환합니다.
+    return updatedUser

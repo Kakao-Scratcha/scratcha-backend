@@ -1,13 +1,15 @@
 # backend/main.py
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
 from db.session import engine
 from sqladmin import Admin
 
-from .routers import users_router, auth_router, application_router, api_key_router
-from .admin.admin import UserAdmin, ApplicationAdmin, AppApiKeyAdmin
-from .admin.auth import AdminAuth
+from app.routers import users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
+from app.admin.admin import UserAdmin, ApplicationAdmin, ApiKeyAdmin
+from app.admin.auth import AdminAuth
 
 
 app = FastAPI(
@@ -15,6 +17,29 @@ app = FastAPI(
     description="API for user management, application, API keys, statistics, and billing.",
     version="0.1.0"
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Pydantic 모델 유효성 검사 오류에 대한 커스텀 핸들러.
+    오류 메시지를 더 읽기 쉬운 형식으로 재구성합니다.
+    """
+    errors = {}
+    for error in exc.errors():
+        field_name = str(error['loc'][-1])
+        message = error['msg']
+        
+        # 'Value error, ' 접두사 제거
+        if error['type'] == 'value_error':
+            message = message.removeprefix('Value error, ')
+            
+        errors[field_name] = message
+    
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": "입력 값의 유효성 검사에 실패했습니다.", "errors": errors},
+    )
 
 # # 데이터베이스 테이블 생성 (첫 실행 시 필요)
 # # 프로덕션에서는 Alembic과 같은 마이그레이션 도구를 사용하는 것이 권장됩니다.
@@ -41,7 +66,7 @@ authentication_backend = AdminAuth(secret_key="...")
 admin = Admin(app, engine, authentication_backend=authentication_backend)
 admin.add_view(UserAdmin)
 admin.add_view(ApplicationAdmin)
-admin.add_view(AppApiKeyAdmin)
+admin.add_view(ApiKeyAdmin)
 
 
 @app.get("/")
@@ -54,3 +79,5 @@ app.include_router(users_router.router, prefix="/api/dashboard")
 app.include_router(auth_router.router, prefix="/api/dashboard")
 app.include_router(application_router.router, prefix="/api/dashboard")
 app.include_router(api_key_router.router, prefix="/api/dashboard")
+app.include_router(usage_stats_router.router, prefix="/api/dashboard")
+app.include_router(captcha_router.router, prefix="/api")
