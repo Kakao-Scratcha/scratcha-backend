@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 
 from app.models.captcha_problem import CaptchaProblem
 from app.models.captcha_session import CaptchaSession
+from app.models.captcha_log import CaptchaLog, CaptchaResult
 
 
 class CaptchaRepository:
@@ -76,3 +77,48 @@ class CaptchaRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"캡챠 세션 생성 중 오류가 발생했습니다: {e}"
             )
+
+    def getCaptchaSessionByClientToken(self, clientToken: str) -> Optional[CaptchaSession]:
+        """
+        클라이언트 토큰을 사용하여 캡챠 세션을 조회합니다.
+
+        Args:
+            clientToken (str): 조회할 캡챠 세션의 클라이언트 토큰.
+
+        Returns:
+            Optional[CaptchaSession]: 조회된 캡챠 세션 객체. 세션이 없으면 None을 반환합니다.
+        """
+        return self.db.query(CaptchaSession).filter(CaptchaSession.clientToken == clientToken).first()
+
+    def createCaptchaLog(self, session: CaptchaSession, result: CaptchaResult, latency_ms: int, ipAddress: Optional[str], userAgent: Optional[str]):
+        """
+        캡챠 검증 결과를 로그로 기록합니다.
+
+        Args:
+            session (CaptchaSession): 검증이 완료된 캡챠 세션.
+            result (CaptchaResult): 검증 결과 (성공, 실패, 타임아웃).
+            latency_ms (int): 응답 시간 (밀리초).
+            ipAddress (Optional[str]): 클라이언트의 IP 주소.
+            userAgent (Optional[str]): 클라이언트의 User-Agent 정보.
+        """
+        log_entry = CaptchaLog(
+            keyId=session.keyId,
+            sessionId=session.id,
+            ipAddress=ipAddress,
+            userAgent=userAgent,
+            result=result,
+            latency_ms=latency_ms
+        )
+        self.db.add(log_entry)
+
+    def logExistForSession(self, session_id: int) -> bool:
+        """
+        주어진 세션 ID에 대한 로그가 이미 존재하는지 확인합니다.
+
+        Args:
+            session_id (int): 확인할 캡챠 세션의 ID.
+
+        Returns:
+            bool: 로그가 존재하면 True, 그렇지 않으면 False.
+        """
+        return self.db.query(CaptchaLog).filter(CaptchaLog.sessionId == session_id).first() is not None

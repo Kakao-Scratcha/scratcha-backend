@@ -3,12 +3,14 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 import uuid
-
+from datetime import datetime, timedelta
+from typing import Optional
 
 from app.models.api_key import ApiKey
 from app.models.user import User
 from app.repositories.captcha_repo import CaptchaRepository
-from app.schemas.captcha import CaptchaProblemResponse
+from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationRequest, CaptchaVerificationResponse
+from app.models.captcha_log import CaptchaResult
 
 
 class CaptchaService:
@@ -90,6 +92,72 @@ class CaptchaService:
             raise e
         except Exception as e:
             # 12. 그 외 예상치 못한 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 500 Internal Server Error를 발생시킵니다.
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+    def verifyCaptchaAnswer(self, request: CaptchaVerificationRequest, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaVerificationResponse:
+        """
+        제출된 캡챠 답변을 검증하고, 결과를 기록하는 비즈니스 로직입니다.
+
+        Args:
+            request (CaptchaVerificationRequest): 클라이언트가 제출한 캡챠 검증 요청 데이터.
+            ipAddress (Optional[str]): 클라이언트의 IP 주소.
+            userAgent (Optional[str]): 클라이언트의 User-Agent 정보.
+
+        Returns:
+            CaptchaVerificationResponse: 캡챠 검증 결과 (성공, 실패, 시간 초과).
+        """
+        try:
+            session = self.captchaRepo.getCaptchaSessionByClientToken(
+                request.clientToken)
+
+            if not session:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="유효하지 않은 클라이언트 토큰입니다."
+                )
+
+            if self.captchaRepo.logExistForSession(session.id):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="이미 검증된 토큰입니다."
+                )
+
+            latency = datetime.utcnow() - session.createdAt
+            if latency > timedelta(minutes=3):
+                self.captchaRepo.createCaptchaLog(
+                    session=session,
+                    result=CaptchaResult.TIMEOUT,
+                    latency_ms=int(latency.total_seconds() * 1000),
+                    ipAddress=ipAddress,
+                    userAgent=userAgent
+                )
+                self.db.commit()
+                return CaptchaVerificationResponse(result="timeout", message="캡챠 세션이 만료되었습니다.")
+
+            correct_answer = session.captchaProblem.answer
+            is_correct = request.answer == correct_answer
+
+            result = CaptchaResult.SUCCESS if is_correct else CaptchaResult.FAIL
+            message = "캡챠 검증에 성공했습니다." if is_correct else "캡챠 검증에 실패했습니다."
+
+            self.captchaRepo.createCaptchaLog(
+                session=session,
+                result=result,
+                latency_ms=int(latency.total_seconds() * 1000),
+                ipAddress=ipAddress,
+                userAgent=userAgent
+            )
+
+            self.db.commit()
+
+            return CaptchaVerificationResponse(result=result.value, message=message)
+
+        except HTTPException as e:
+            self.db.rollback()
+            raise e
+        except Exception as e:
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

@@ -1,6 +1,6 @@
 # app/routers/captcha_router.py
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 
 
@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.security import getValidApiKey
 from app.models.api_key import ApiKey
 from db.session import get_db
-from app.schemas.captcha import CaptchaProblemResponse
+from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationRequest, CaptchaVerificationResponse
 from app.services.captcha_service import CaptchaService
 
 
@@ -50,3 +50,33 @@ def getCaptchaProblem(
     newProblem = captchaService.generateCaptchaProblem(apiKey)
     # 3. 생성된 캡챠 문제 정보를 클라이언트에게 반환합니다.
     return newProblem
+
+
+@router.post(
+    "/verify",
+    response_model=CaptchaVerificationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="캡챠 답변 검증",
+    description="클라이언트로부터 캡챠 문제에 대한 답변을 받아 정답 여부를 검증합니다."
+)
+def verifyCaptchaAnswer(
+    request: CaptchaVerificationRequest,
+    fastApiRequest: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    사용자가 제출한 캡챠 답변의 유효성을 검사합니다.
+
+    Args:
+        request (CaptchaVerificationRequest): 클라이언트가 제출한 캡챠 답변 데이터 (클라이언트 토큰, 정답).
+        fastApiRequest (Request): FastAPI의 Request 객체. 클라이언트 IP와 User-Agent를 얻기 위해 사용됩니다.
+        db (Session): 데이터베이스 세션.
+
+    Returns:
+        CaptchaVerificationResponse: 검증 결과 (성공, 실패, 시간 초과).
+    """
+    captchaService = CaptchaService(db)
+    ipAddress = fastApiRequest.client.host
+    userAgent = fastApiRequest.headers.get("user-agent")
+    result = captchaService.verifyCaptchaAnswer(request, ipAddress, userAgent)
+    return result
