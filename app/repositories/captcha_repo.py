@@ -111,7 +111,7 @@ class CaptchaRepository:
         )
         self.db.add(log_entry)
 
-    def logExistForSession(self, session_id: int) -> bool:
+    def does_log_exist_for_session(self, session_id: int) -> bool:
         """
         주어진 세션 ID에 대한 로그가 이미 존재하는지 확인합니다.
 
@@ -122,3 +122,15 @@ class CaptchaRepository:
             bool: 로그가 존재하면 True, 그렇지 않으면 False.
         """
         return self.db.query(CaptchaLog).filter(CaptchaLog.sessionId == session_id).first() is not None
+
+    def get_problem_by_id(self, problem_id: int) -> Optional[CaptchaProblem]:
+        """
+        문제 ID로 캡챠 문제를 조회합니다.
+
+        Args:
+            problem_id (int): 조회할 캡챠 문제의 ID.
+
+        Returns:
+            Optional[CaptchaProblem]: 조회된 캡챠 문제 객체. 문제가 없으면 None을 반환합니다.
+        """
+        return self.db.query(CaptchaProblem).filter(CaptchaProblem.id == problem_id).first()

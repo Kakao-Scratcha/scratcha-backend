@@ -12,8 +12,8 @@ class CaptchaProblemResponse(BaseModel):
     )
     imageUrl: str = Field(
         ...,
-        description="캡챠 이미지의 URL",
-        example="https://example.com/captcha/images/12345.png"
+        description="캡챠 이미지에 접근할 수 있는 API URL",
+        example="/api/captcha/image/123"
     )
     prompt: str = Field(
         ...,

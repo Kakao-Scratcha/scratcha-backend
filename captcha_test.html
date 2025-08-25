@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>캡챠 테스트 (순수 JS)</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                background-color: #f4f4f4;
+                margin: 0;
+            }
+            .container {
+                background-color: #fff;
+                padding: 30px;
+                border-radius: 8px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                max-width: 500px;
+                width: 100%;
+                text-align: center;
+            }
+            img {
+                max-width: 100%;
+                height: auto;
+                border: 1px solid #eee;
+                border-radius: 4px;
+                margin-top: 15px;
+                margin-bottom: 15px;
+            }
+            ul {
+                list-style: none;
+                padding: 0;
+            }
+            li {
+                background-color: #e9e9e9;
+                margin: 5px 0;
+                padding: 10px;
+                border-radius: 4px;
+                cursor: pointer; /* 선택지 클릭 가능하도록 */
+            }
+            li:hover {
+                background-color: #dcdcdc;
+            }
+            .loading,
+            .error {
+                font-weight: bold;
+                color: #007bff;
+            }
+            .error {
+                color: #dc3545;
+            }
+            .result-success {
+                color: #28a745;
+                font-weight: bold;
+            }
+            .result-fail,
+            .result-timeout {
+                color: #dc3545;
+                font-weight: bold;
+            }
+            .input-group {
+                margin-top: 20px;
+                display: flex;
+                gap: 10px;
+            }
+            .input-group input[type="text"] {
+                flex-grow: 1;
+                padding: 10px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+            .input-group button {
+                padding: 10px 15px;
+                background-color: #007bff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            .input-group button:hover {
+                background-color: #0056b3;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>캡챠 테스트</h2>
+            <div id="status" class="loading">캡챠 문제 로딩 중...</div>
+            <div id="captcha-content" style="display: none">
+                <p><strong>클라이언트 토큰:</strong> <span id="client-token"></span></p>
+                <p><strong>프롬프트:</strong> <span id="prompt"></span></p>
+                <p><strong>캡챠 이미지:</strong></p>
+                <img id="captcha-image" src="" alt="캡챠 이미지" />
+                <p><strong>선택지:</strong></p>
+                <ul id="options-list"></ul>
+
+                <div class="input-group">
+                    <input type="text" id="answer-input" placeholder="여기에 정답을 입력하세요" />
+                    <button id="submit-button">정답 제출</button>
+                </div>
+                <div id="verification-result" style="margin-top: 15px"></div>
+            </div>
+        </div>
+
+        <script>
+            // TODO: 실제 API 서버 주소와 API 키로 변경해주세요.
+            const API_BASE_URL = "http://localhost:8001"; // FastAPI 서버 주소
+            const API_KEY = "0398ae28e705372ed94e266eed8f0f44c057ba00753769ac9a8b9468d9a57f13"; // 유효한 X-Api-Key
+
+            const statusDiv = document.getElementById("status");
+            const captchaContentDiv = document.getElementById("captcha-content");
+            const clientTokenSpan = document.getElementById("client-token");
+            const promptSpan = document.getElementById("prompt");
+            const captchaImage = document.getElementById("captcha-image");
+            const optionsList = document.getElementById("options-list");
+            const answerInput = document.getElementById("answer-input");
+            const submitButton = document.getElementById("submit-button");
+            const verificationResultDiv = document.getElementById("verification-result");
+
+            let currentClientToken = null; // 현재 캡챠의 clientToken을 저장
+
+            async function fetchCaptchaProblem() {
+                try {
+                    statusDiv.textContent = "캡챠 문제 로딩 중...";
+                    statusDiv.className = "loading";
+                    captchaContentDiv.style.display = "none";
+                    verificationResultDiv.textContent = ""; // 이전 결과 초기화
+                    answerInput.value = ""; // 입력 필드 초기화
+
+                    // 1단계: 캡챠 문제 요청 (POST /api/captcha/problem)
+                    const response = await fetch(`${API_BASE_URL}/api/captcha/problem`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-Api-Key": API_KEY, // API 키 헤더에 포함
+                        },
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(
+                            `HTTP error! status: ${response.status}, detail: ${errorData.detail || response.statusText}`
+                        );
+                    }
+
+                    const data = await response.json();
+                    console.log("Received Captcha Problem:", data);
+
+                    // 데이터 표시
+                    currentClientToken = data.clientToken; // clientToken 저장
+                    clientTokenSpan.textContent = data.clientToken;
+                    promptSpan.textContent = data.prompt;
+
+                    // 2단계: 이미지 로딩 (GET /api/captcha/image/{problem_id})
+                    if (data.imageUrl) {
+                        captchaImage.src = data.imageUrl;
+                    } else {
+                        captchaImage.alt = "이미지 URL을 찾을 수 없습니다.";
+                    }
+
+                    optionsList.innerHTML = ""; // 기존 선택지 초기화
+                    data.options.forEach((option) => {
+                        const li = document.createElement("li");
+                        li.textContent = option;
+                        li.onclick = () => {
+                            answerInput.value = option;
+                        }; // 선택지 클릭 시 입력 필드에 자동 입력
+                        optionsList.appendChild(li);
+                    });
+
+                    statusDiv.style.display = "none"; // 로딩 메시지 숨김
+                    captchaContentDiv.style.display = "block"; // 캡챠 내용 표시
+                } catch (e) {
+                    console.error("Error fetching captcha problem:", e);
+                    statusDiv.textContent = `오류 발생: ${e.message}`;
+                    statusDiv.className = "error";
+                    statusDiv.style.display = "block";
+                    captchaContentDiv.style.display = "none";
+                }
+            }
+
+            async function submitCaptchaAnswer() {
+                if (!currentClientToken) {
+                    verificationResultDiv.textContent = "클라이언트 토큰이 없습니다. 캡챠를 먼저 로드해주세요.";
+                    verificationResultDiv.className = "result-fail";
+                    return;
+                }
+
+                const userAnswer = answerInput.value.trim();
+                if (!userAnswer) {
+                    verificationResultDiv.textContent = "정답을 입력해주세요.";
+                    verificationResultDiv.className = "result-fail";
+                    return;
+                }
+
+                verificationResultDiv.textContent = "정답 제출 중...";
+                verificationResultDiv.className = "loading";
+                submitButton.disabled = true; // 제출 버튼 비활성화
+
+                try {
+                    // 3단계: 캡챠 정답 검증 (POST /api/captcha/verify)
+                    const response = await fetch(`${API_BASE_URL}/api/captcha/verify`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-Client-Token": currentClientToken, // clientToken을 헤더에 포함
+                        },
+                        body: JSON.stringify({ answer: userAnswer }), // 정답만 본문에 포함
+                    });
+
+                    const resultData = await response.json();
+                    console.log("Verification Result:", resultData);
+
+                    verificationResultDiv.textContent = `결과: ${resultData.result.toUpperCase()} - ${
+                        resultData.message
+                    }`;
+                    verificationResultDiv.className = `result-${resultData.result}`; // 결과에 따라 클래스 변경
+                } catch (e) {
+                    console.error("Error submitting answer:", e);
+                    verificationResultDiv.textContent = `검증 중 오류 발생: ${e.message}`;
+                    verificationResultDiv.className = "error";
+                } finally {
+                    submitButton.disabled = false; // 제출 버튼 다시 활성화
+                    // 검증 후 새 캡챠 로드 (선택 사항)
+                    // setTimeout(fetchCaptchaProblem, 3000); // 3초 후 새 캡챠 로드
+                }
+            }
+
+            // 이벤트 리스너 연결
+            document.addEventListener("DOMContentLoaded", fetchCaptchaProblem);
+            submitButton.addEventListener("click", submitCaptchaAnswer);
+            // 엔터 키로 제출
+            answerInput.addEventListener("keypress", (event) => {
+                if (event.key === "Enter") {
+                    submitCaptchaAnswer();
+                }
+            });
+        </script>
+    </body>
+</html>

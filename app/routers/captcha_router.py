@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, status, Request, Header
 from sqlalchemy.orm import Session
 from typing import Annotated
 
-
 # 프로젝트 의존성 및 모델, 서비스 임포트
 from app.core.security import getValidApiKey
 from app.models.api_key import ApiKey
@@ -44,12 +43,8 @@ def getCaptchaProblem(
     Returns:
         CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보 (클라이언트 토큰, 이미지 URL, 프롬프트, 선택지).
     """
-    # 1. CaptchaService 인스턴스를 생성합니다.
     captchaService = CaptchaService(db)
-    # 2. 캡챠 서비스의 문제 생성 로직을 호출합니다.
-    # 이 때, 어떤 API 키가 문제를 요청했는지 식별하기 위해 apiKey 객체를 전달합니다.
     newProblem = captchaService.generateCaptchaProblem(apiKey)
-    # 3. 생성된 캡챠 문제 정보를 클라이언트에게 반환합니다.
     return newProblem
 
 
