@@ -1,7 +1,8 @@
 # app/routers/captcha_router.py
 
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status, Request, Header
 from sqlalchemy.orm import Session
+from typing import Annotated
 
 
 # 프로젝트 의존성 및 모델, 서비스 임포트
@@ -34,7 +35,7 @@ def getCaptchaProblem(
     """
     새로운 캡챠 문제를 생성하고 클라이언트에게 반환합니다.
 
-    이 엔드포인트는 'x-api-key' 헤더를 통해 유효한 API 키를 받아야만 호출할 수 있습니다.
+    이 엔드포인트는 'X-Api-Key' 헤더를 통해 유효한 API 키를 받아야만 호출할 수 있습니다.
 
     Args:
         apiKey (ApiKey): `getValidApiKey` 의존성으로 주입된, 유효성이 검증된 API 키 객체.
@@ -62,14 +63,16 @@ def getCaptchaProblem(
 def verifyCaptchaAnswer(
     request: CaptchaVerificationRequest,
     fastApiRequest: Request,
+    clientToken: Annotated[str, Header(alias="X-Client-Token")],
     db: Session = Depends(get_db)
 ):
     """
     사용자가 제출한 캡챠 답변의 유효성을 검사합니다.
 
     Args:
-        request (CaptchaVerificationRequest): 클라이언트가 제출한 캡챠 답변 데이터 (클라이언트 토큰, 정답).
+        request (CaptchaVerificationRequest): 클라이언트가 제출한 캡챠 답변 데이터 (정답).
         fastApiRequest (Request): FastAPI의 Request 객체. 클라이언트 IP와 User-Agent를 얻기 위해 사용됩니다.
+        clientToken (str): `X-Client-Token` 헤더로 전달되는 고유 클라이언트 토큰.
         db (Session): 데이터베이스 세션.
 
     Returns:
@@ -78,5 +81,6 @@ def verifyCaptchaAnswer(
     captchaService = CaptchaService(db)
     ipAddress = fastApiRequest.client.host
     userAgent = fastApiRequest.headers.get("user-agent")
-    result = captchaService.verifyCaptchaAnswer(request, ipAddress, userAgent)
+    result = captchaService.verifyCaptchaAnswer(
+        clientToken, request, ipAddress, userAgent)
     return result

@@ -96,11 +96,12 @@ class CaptchaService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-    def verifyCaptchaAnswer(self, request: CaptchaVerificationRequest, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaVerificationResponse:
+    def verifyCaptchaAnswer(self, clientToken: str, request: CaptchaVerificationRequest, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaVerificationResponse:
         """
         제출된 캡챠 답변을 검증하고, 결과를 기록하는 비즈니스 로직입니다.
 
         Args:
+            clientToken (str): 클라이언트로부터 헤더로 받은 고유 토큰.
             request (CaptchaVerificationRequest): 클라이언트가 제출한 캡챠 검증 요청 데이터.
             ipAddress (Optional[str]): 클라이언트의 IP 주소.
             userAgent (Optional[str]): 클라이언트의 User-Agent 정보.
@@ -110,7 +111,7 @@ class CaptchaService:
         """
         try:
             session = self.captchaRepo.getCaptchaSessionByClientToken(
-                request.clientToken)
+                clientToken)
 
             if not session:
                 raise HTTPException(

@@ -188,16 +188,16 @@ def getPasswordHash(password: str) -> str:
     return pwdContext.hash(password)
 
 
-# API Key 인증이 필요한 라우터에서 사용: x-api-key 헤더의 유효성 검증
+# API Key 인증이 필요한 라우터에서 사용: X-Api-Key 헤더의 유효성 검증
 async def getValidApiKey(
-    xApiKey: str = Header(..., alias="x-api-key"),
+    xApiKey: str = Header(..., alias="X-Api-Key"),
     db: Session = Depends(get_db)
 ) -> ApiKey:
     """
-    HTTP 요청 헤더의 'x-api-key' 값을 검증하여 유효한 `ApiKey` 모델 객체를 반환합니다.
+    HTTP 요청 헤더의 'X-Api-Key' 값을 검증하여 유효한 `ApiKey` 모델 객체를 반환합니다.
 
     Args:
-        xApiKey (str, optional): `Header` 의존성을 통해 추출된 'x-api-key' 값.
+        xApiKey (str, optional): `Header` 의존성을 통해 추출된 'X-Api-Key' 값.
         db (Session, optional): `get_db` 의존성을 통해 얻는 데이터베이스 세션.
 
     Returns:

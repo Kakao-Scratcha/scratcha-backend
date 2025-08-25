@@ -8,7 +8,7 @@ class CaptchaProblemResponse(BaseModel):
     clientToken: str = Field(
         ...,
         description="캡챠 문제 해결을 위한 고유 클라이언트 토큰",
-        example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ..."
+        example="48417c81-929b-4595-9c8f-7031819d27fc"
     )
     imageUrl: str = Field(
         ...,
@@ -31,11 +31,6 @@ class CaptchaProblemResponse(BaseModel):
 
 
 class CaptchaVerificationRequest(BaseModel):
-    clientToken: str = Field(
-        ...,
-        description="캡챠 문제 해결을 위해 발급받은 고유 클라이언트 토큰",
-        example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ..."
-    )
     answer: str = Field(
         ...,
         description="사용자가 선택한 정답",
