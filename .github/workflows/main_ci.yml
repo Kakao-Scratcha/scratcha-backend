@@ -1,53 +1,53 @@
-name: CI/CD Pipeline
+name: CI/CD Backend
 
 on:
     push:
         branches:
+            - main
             - develop
     pull_request:
         branches:
+            - main
             - develop
 
 jobs:
     deploy:
-        # 셀프 호스팅 러너에서 잡을 실행합니다.
-        runs-on: self-hosted
+        runs-on: ubuntu-latest
         # develop 브랜치에 푸시된 경우에만 이 잡을 실행합니다.
         if: github.ref == 'refs/heads/develop'
+        env:
+            SERVICE_NAME: api
+            REGISTRY: ${{ secrets.KCR_REGISTRY_URL }}
+            IMAGE_NAME: ${{ secrets.KCR_DEV_IMAGE_NAME }}
 
         steps:
             - name: Checkout code
-              # 최신 코드를 러너에 체크아웃합니다.
               uses: actions/checkout@v4
 
             - name: Set up Docker Buildx
-              # 도커 빌드x 환경을 설정하여 빌드 캐시를 활성화합니다.
               uses: docker/setup-buildx-action@v3
 
-            - name: Log in to Docker Hub
-              # 도커 허브에 로그인하여 이미지를 푸시하고 캐시를 사용합니다.
-              uses: docker/login-action@v3
-              with:
-                  username: ${{ secrets.DOCKER_USERNAME }}
-                  password: ${{ secrets.DOCKER_PASSWORD }}
+            - name: Login to Kakao Cloud Registry
+              # 카카오클라우드 레지스트리에 로그인합니다.
+              run: |
+                  echo "${{ secrets.KCR_PASSWORD }}" | docker login ${{ secrets.KCR_REGISTRY_URL }} -u "${{ secrets.KCR_USER }}" --password-stdin
 
             - name: Build and push Docker image
-              # 이미지를 빌드하고 도커 허브에 푸시합니다.
-              # latest와 커밋 SHA 두 가지 태그를 모두 적용합니다.
-              uses: docker/build-push-action@v5
-              with:
-                  context: .
-                  push: true
-                  tags: ${{ secrets.DOCKER_IMAGE }}:latest, ${{ secrets.DOCKER_IMAGE }}:${{ github.sha }}
-                  # 최신 이미지에서 빌드 캐시를 가져와 빌드 시간을 단축합니다.
-                  cache-from: type=registry,ref=${{ secrets.DOCKER_IMAGE }}:latest
-                  # 다음 빌드에 사용될 캐시를 인라인으로 저장합니다.
-                  cache-to: type=inline
+              # 이미지를 빌드하고 KCR에 푸시합니다.
+              # date + github.sha 조합으로 태그를 생성하고 빌드 캐시를 활용합니다.
+              run: |
+                  IMAGE_TAG=$(date +%Y%m%d%H%M%S)-${{ github.sha }}
+                  echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+                  docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG .
+                  docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG
+                  docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+                  docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
             - name: Run tests (if any)
               # 이 부분에 테스트 명령어를 추가하여 이미지를 컨테이너로 실행하고 테스트합니다.
               run: echo "No tests defined yet. Add your test commands here."
-              # 예시: docker run --rm ${{ secrets.DOCKER_IMAGE }}:${{ github.sha }} pytest
+              # 예시: docker run --rm ${{ secrets.KCR_REGISTRY_URL }}/${{ secrets.KCR_DEV_IMAGE_NAME }}:${{ env.IMAGE_TAG }} pytest
 
             - name: Set up SSH Agent
               # SSH 프라이빗 키를 설정하여 서버에 접속할 수 있도록 합니다.
@@ -59,21 +59,72 @@ jobs:
               env:
                   SSH_HOST: ${{ secrets.SSH_HOST }} # 베스천 호스트의 퍼블릭 IP
                   SSH_USERNAME: ${{ secrets.SSH_USERNAME }} # 베스천 호스트 사용자 이름
-                  BACKEND_HOST: ${{ secrets.BACKEND_HOST }} # 백엔드 인스턴스의 프라이빗 IP
-                  BACKEND_USERNAME: ${{ secrets.BACKEND_USERNAME }} # 백엔드 인스턴스 사용자 이름
+                  SSH_PORT: ${{ secrets.SSH_PORT }} # 베스천 SSH 포트
               run: |
                   # 셸 명령어 실행 과정을 출력하여 디버깅을 돕습니다.
                   set -x
 
                   # SSH 접속 시 호스트 키 확인을 위한 디렉터리를 생성합니다.
                   mkdir -p ~/.ssh
-                  # 베스천 및 백엔드 서버의 호스트 키를 known_hosts에 추가합니다.
+                  # 베스천 호스트 키를 known_hosts에 추가합니다.
                   ssh-keyscan -v -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>&1
-                  ssh-keyscan -v -H "$BACKEND_HOST" >> ~/.ssh/known_hosts 2>&1
 
                   # 베스천을 통해 백엔드 서버에 접속하여 배포 명령을 실행합니다.
-                  # StrictHostKeyChecking=yes로 보안을 유지합니다.
-                  ssh -v -o StrictHostKeyChecking=yes \
-                      -o ProxyCommand="ssh -v -W %h:%p ${{ env.SSH_USERNAME }}@${{ env.SSH_HOST }} 2>&1" \
-                      "${{ env.BACKEND_USERNAME }}@${{ env.BACKEND_HOST }}" \
-                      "docker stop scratcha_server || true && docker rm scratcha_server || true && docker pull ${{ secrets.DOCKER_IMAGE }}:${{ github.sha }} && docker run -d --name scratcha_server --env-file /home/${{ env.BACKEND_USERNAME }}/.env -p 8001:8001 ${{ secrets.DOCKER_IMAGE }}:${{ github.sha }}" 2>&1
+                  # StrictHostKeyChecking=no로 호스트 키 검증 우회 (CI/CD 환경용)
+                  # 배포 서버에서도 Docker 로그인 수행
+                  ssh -v -o StrictHostKeyChecking=no \
+                       -p $SSH_PORT \
+                       "$SSH_USERNAME@$SSH_HOST" \
+                       "echo '${{ secrets.KCR_PASSWORD }}' | docker login ${{ secrets.KCR_REGISTRY_URL }} -u '${{ secrets.KCR_USER }}' --password-stdin && docker stop scratcha_server || true && docker rm scratcha_server || true && docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} && docker run -d --name scratcha_server --env-file /home/ubuntu/.env -p 8001:8001 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" 2>&1
+
+    # 메인 브랜치에 푸시될 때 ArgoCD로 배포하는 새로운 잡
+    deploy-to-argocd:
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/main'
+        env:
+            SERVICE_NAME: api
+            REGISTRY: ${{ secrets.KCR_REGISTRY_URL }}
+            IMAGE_NAME: ${{ secrets.KCR_IMAGE_NAME }}
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Login to Kakao Cloud Registry
+              run: |
+                  echo "${{ secrets.KCR_PASSWORD }}" | docker login ${{ secrets.KCR_REGISTRY_URL }} -u "${{ secrets.KCR_USER }}" --password-stdin
+
+            - name: Build & Push Docker Image
+              # 이미지를 빌드하고 KCR에 푸시합니다.
+              # 빌드 캐시를 활용하여 빌드 시간을 단축합니다.
+              run: |
+                  IMAGE_TAG=$(date +%Y%m%d%H%M%S)-${{ github.sha }}
+                  echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+                  docker build -t ${{ secrets.KCR_REGISTRY_URL }}/${{ secrets.KCR_IMAGE_NAME }}:$IMAGE_TAG .
+                  docker push ${{ secrets.KCR_REGISTRY_URL }}/${{ secrets.KCR_IMAGE_NAME }}:$IMAGE_TAG
+                  docker tag ${{ secrets.KCR_REGISTRY_URL }}/${{ secrets.KCR_IMAGE_NAME }}:$IMAGE_TAG ${{ secrets.KCR_REGISTRY_URL }}/${{ secrets.KCR_IMAGE_NAME }}:latest
+                  docker push ${{ secrets.KCR_REGISTRY_URL }}/${{ secrets.KCR_IMAGE_NAME }}:latest
+
+            - name: Checkout test Repo
+              uses: actions/checkout@v4
+              with:
+                  repository: ${{ secrets.REPO_NAME }}
+                  token: ${{ secrets.REPO_TOKEN }}
+                  path: ${{ secrets.REPO_PATH }}
+
+            - name: Update values.yaml
+              run: |
+                  sed -i "s|tag:.*|tag: \"${{ env.IMAGE_TAG }}\"|" ${{ secrets.REPO_PATH }}/${{ secrets.HELM_CHART_PATH }}/values.yaml
+
+            - name: Commit & Push changes
+              run: |
+                  cd ${{ secrets.REPO_PATH }}
+                  git config user.name "github-actions"
+                  git config user.email "actions@github.com"
+                  git add ${{ secrets.HELM_CHART_PATH }}/values.yaml
+                  git commit -m "Update backend image tag to ${{ env.IMAGE_TAG }}"
+                  git push origin main
