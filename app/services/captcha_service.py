@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
+import os
 
 from app.models.api_key import ApiKey
 from app.models.user import User
@@ -33,7 +34,7 @@ class CaptchaService:
             apiKey (ApiKey): 캡챠 문제를 요청한 API 키 객체.
 
         Returns:
-            CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보와 클라이언트 토큰.
+            CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보 (클라이언트 토큰, 이미지 URL, 프롬프트, 선택지).
         """
         try:
             # 1. API 키에 연결된 사용자(User) 객체를 조회하고, 비관적 잠금(with_for_update)을 적용하여 동시성 문제를 방지합니다.
@@ -69,15 +70,26 @@ class CaptchaService:
                 clientToken=clientToken
             )
 
-            # 8. 사용자 토큰 차감 및 캡챠 세션 생성 등 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
+            # 8. S3_BASE_URL 환경 변수를 가져와 전체 이미지 URL을 구성합니다.
+            s3BaseUrl = os.getenv("S3_BASE_URL")
+            if not s3BaseUrl:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="S3_BASE_URL 환경 변수가 설정되지 않았습니다."
+                )
+
+            # S3 이미지 키와 S3_BASE_URL을 조합하여 클라이언트가 직접 접근할 수 있는 전체 URL을 생성합니다.
+            fullImageUrl = f"{s3BaseUrl}/{selectedProblem.imageUrl}"
+
+            # 9. 사용자 토큰 차감 및 캡챠 세션 생성 등 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
             self.db.commit()
-            # 9. 커밋된 세션 객체를 새로고침하여 최신 상태를 반영합니다.
+            # 10. 커밋된 세션 객체를 새로고침하여 최신 상태를 반영합니다.
             self.db.refresh(session)
 
-            # 10. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
+            # 11. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
             return CaptchaProblemResponse(
                 clientToken=session.clientToken,
-                imageUrl=selectedProblem.imageUrl,
+                imageUrl=fullImageUrl,  # S3 직접 이미지 URL을 반환
                 prompt=selectedProblem.prompt,
                 options=[
                     selectedProblem.answer,
@@ -87,11 +99,11 @@ class CaptchaService:
                 ]
             )
         except HTTPException as e:
-            # 11. HTTP 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 해당 예외를 다시 발생시킵니다.
+            # 12. HTTP 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 해당 예외를 다시 발생시킵니다.
             self.db.rollback()
             raise e
         except Exception as e:
-            # 12. 그 외 예상치 못한 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 500 Internal Server Error를 발생시킵니다.
+            # 13. 그 외 예상치 못한 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 500 Internal Server Error를 발생시킵니다.
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -119,7 +131,7 @@ class CaptchaService:
                     detail="유효하지 않은 클라이언트 토큰입니다."
                 )
 
-            if self.captchaRepo.logExistForSession(session.id):
+            if self.captchaRepo.does_log_exist_for_session(session.id):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="이미 검증된 토큰입니다."
