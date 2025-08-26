@@ -62,27 +62,29 @@
                 color: #dc3545;
                 font-weight: bold;
             }
-            .input-group {
-                margin-top: 20px;
+            .copy-group {
                 display: flex;
-                gap: 10px;
+                align-items: center;
+                justify-content: center;
+                gap: 5px;
+                margin-bottom: 10px;
             }
-            .input-group input[type="text"] {
-                flex-grow: 1;
-                padding: 10px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-            }
-            .input-group button {
-                padding: 10px 15px;
-                background-color: #007bff;
+            .copy-group button {
+                padding: 5px 10px;
+                background-color: #6c757d;
                 color: white;
                 border: none;
                 border-radius: 4px;
                 cursor: pointer;
+                font-size: 0.8em;
             }
-            .input-group button:hover {
-                background-color: #0056b3;
+            .copy-group button:hover {
+                background-color: #5a6268;
+            }
+            .copy-message {
+                font-size: 0.8em;
+                color: #28a745;
+                margin-left: 5px;
             }
         </style>
     </head>
@@ -91,34 +93,35 @@
             <h2>캡챠 테스트</h2>
             <div id="status" class="loading">캡챠 문제 로딩 중...</div>
             <div id="captcha-content" style="display: none">
-                <p><strong>클라이언트 토큰:</strong> <span id="client-token"></span></p>
+                <div class="copy-group">
+                    <p><strong>클라이언트 토큰:</strong> <span id="client-token"></span></p>
+                    <button id="copy-token-button">복사</button>
+                    <span id="copy-message" class="copy-message"></span>
+                </div>
                 <p><strong>프롬프트:</strong> <span id="prompt"></span></p>
                 <p><strong>캡챠 이미지:</strong></p>
                 <img id="captcha-image" src="" alt="캡챠 이미지" />
                 <p><strong>선택지:</strong></p>
                 <ul id="options-list"></ul>
 
-                <div class="input-group">
-                    <input type="text" id="answer-input" placeholder="여기에 정답을 입력하세요" />
-                    <button id="submit-button">정답 제출</button>
-                </div>
                 <div id="verification-result" style="margin-top: 15px"></div>
             </div>
         </div>
 
         <script>
             // TODO: 실제 API 서버 주소와 API 키로 변경해주세요.
-            const API_BASE_URL = "http://localhost:8001"; // FastAPI 서버 주소
-            const API_KEY = "0398ae28e705372ed94e266eed8f0f44c057ba00753769ac9a8b9468d9a57f13"; // 유효한 X-Api-Key
+            //const API_BASE_URL = "https://api.scratcha.cloud"; // FastAPI 서버 주소
+            const API_BASE_URL = "http://localhost:8001";
+            const API_KEY = "fa10a7e22508cfc50fd4392d2e88c5f5ee3c4d047575970db5a374a20a56e3b4"; // 유효한 X-Api-Key
 
             const statusDiv = document.getElementById("status");
             const captchaContentDiv = document.getElementById("captcha-content");
             const clientTokenSpan = document.getElementById("client-token");
+            const copyTokenButton = document.getElementById("copy-token-button");
+            const copyMessageSpan = document.getElementById("copy-message");
             const promptSpan = document.getElementById("prompt");
             const captchaImage = document.getElementById("captcha-image");
             const optionsList = document.getElementById("options-list");
-            const answerInput = document.getElementById("answer-input");
-            const submitButton = document.getElementById("submit-button");
             const verificationResultDiv = document.getElementById("verification-result");
 
             let currentClientToken = null; // 현재 캡챠의 clientToken을 저장
@@ -129,7 +132,7 @@
                     statusDiv.className = "loading";
                     captchaContentDiv.style.display = "none";
                     verificationResultDiv.textContent = ""; // 이전 결과 초기화
-                    answerInput.value = ""; // 입력 필드 초기화
+                    copyMessageSpan.textContent = ""; // 복사 메시지 초기화
 
                     // 1단계: 캡챠 문제 요청 (POST /api/captcha/problem)
                     const response = await fetch(`${API_BASE_URL}/api/captcha/problem`, {
@@ -166,9 +169,10 @@
                     data.options.forEach((option) => {
                         const li = document.createElement("li");
                         li.textContent = option;
-                        li.onclick = () => {
-                            answerInput.value = option;
-                        }; // 선택지 클릭 시 입력 필드에 자동 입력
+                        // 선택지 클릭 시 정답 입력 및 자동 제출
+                        li.onclick = async () => {
+                            await submitCaptchaAnswer(option); // 정답 제출 함수 호출
+                        };
                         optionsList.appendChild(li);
                     });
 
@@ -183,14 +187,13 @@
                 }
             }
 
-            async function submitCaptchaAnswer() {
+            async function submitCaptchaAnswer(userAnswer) {
                 if (!currentClientToken) {
                     verificationResultDiv.textContent = "클라이언트 토큰이 없습니다. 캡챠를 먼저 로드해주세요.";
                     verificationResultDiv.className = "result-fail";
                     return;
                 }
 
-                const userAnswer = answerInput.value.trim();
                 if (!userAnswer) {
                     verificationResultDiv.textContent = "정답을 입력해주세요.";
                     verificationResultDiv.className = "result-fail";
@@ -199,7 +202,6 @@
 
                 verificationResultDiv.textContent = "정답 제출 중...";
                 verificationResultDiv.className = "loading";
-                submitButton.disabled = true; // 제출 버튼 비활성화
 
                 try {
                     // 3단계: 캡챠 정답 검증 (POST /api/captcha/verify)
@@ -219,24 +221,44 @@
                         resultData.message
                     }`;
                     verificationResultDiv.className = `result-${resultData.result}`; // 결과에 따라 클래스 변경
+
+                    // 검증 후 새 캡챠 로드 (선택 사항: 성공/실패 여부와 관계없이 새 캡챠 로드)
+                    setTimeout(fetchCaptchaProblem, 1500); // 1.5초 후 새 캡챠 로드
                 } catch (e) {
                     console.error("Error submitting answer:", e);
                     verificationResultDiv.textContent = `검증 중 오류 발생: ${e.message}`;
                     verificationResultDiv.className = "error";
                 } finally {
-                    submitButton.disabled = false; // 제출 버튼 다시 활성화
-                    // 검증 후 새 캡챠 로드 (선택 사항)
-                    // setTimeout(fetchCaptchaProblem, 3000); // 3초 후 새 캡챠 로드
+                    // submitButton.disabled = false; // 제출 버튼 다시 활성화 (삭제되었으므로 필요 없음)
                 }
             }
 
             // 이벤트 리스너 연결
             document.addEventListener("DOMContentLoaded", fetchCaptchaProblem);
-            submitButton.addEventListener("click", submitCaptchaAnswer);
-            // 엔터 키로 제출
-            answerInput.addEventListener("keypress", (event) => {
-                if (event.key === "Enter") {
-                    submitCaptchaAnswer();
+            // submitButton.addEventListener("click", submitCaptchaAnswer); // 제출 버튼 삭제되었으므로 필요 없음
+            // 엔터 키로 제출 (텍스트 입력 필드 삭제되었으므로 필요 없음)
+            // answerInput.addEventListener("keypress", (event) => {
+            //     if (event.key === "Enter") {
+            //         submitCaptchaAnswer();
+            //     }
+            // });
+
+            // 클라이언트 토큰 복사 버튼 이벤트 리스너
+            copyTokenButton.addEventListener("click", async () => {
+                try {
+                    await navigator.clipboard.writeText(clientTokenSpan.textContent);
+                    copyMessageSpan.textContent = "복사됨!";
+                    setTimeout(() => {
+                        copyMessageSpan.textContent = "";
+                    }, 1500); // 1.5초 후 메시지 사라짐
+                } catch (err) {
+                    console.error("클립보드 복사 실패:", err);
+                    copyMessageSpan.textContent = "복사 실패!";
+                    copyMessageSpan.style.color = "red";
+                    setTimeout(() => {
+                        copyMessageSpan.textContent = "";
+                        copyMessageSpan.style.color = "";
+                    }, 1500);
                 }
             });
         </script>

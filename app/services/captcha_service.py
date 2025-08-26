@@ -10,6 +10,7 @@ import os
 from app.models.api_key import ApiKey
 from app.models.user import User
 from app.repositories.captcha_repo import CaptchaRepository
+from app.repositories.usage_stats_repo import UsageStatsRepository
 from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationRequest, CaptchaVerificationResponse
 from app.models.captcha_log import CaptchaResult
 
@@ -81,12 +82,17 @@ class CaptchaService:
             # S3 이미지 키와 S3_BASE_URL을 조합하여 클라이언트가 직접 접근할 수 있는 전체 URL을 생성합니다.
             fullImageUrl = f"{s3BaseUrl}/{selectedProblem.imageUrl}"
 
-            # 9. 사용자 토큰 차감 및 캡챠 세션 생성 등 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
+            # 9. usage_stats_repo를 사용하여 요청 카운트를 업데이트합니다.
+            usageStatsRepo = UsageStatsRepository(self.db)
+            usageStatsRepo.incrementTotalRequests(apiKey.id)
+
+            # 10. 사용자 토큰 차감 및 캡챠 세션 생성 등 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
             self.db.commit()
-            # 10. 커밋된 세션 객체를 새로고침하여 최신 상태를 반영합니다.
+
+            # 11. 커밋된 세션 객체를 새로고침하여 최신 상태를 반영합니다.
             self.db.refresh(session)
 
-            # 11. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
+            # 12. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
             return CaptchaProblemResponse(
                 clientToken=session.clientToken,
                 imageUrl=fullImageUrl,  # S3 직접 이미지 URL을 반환
@@ -146,6 +152,11 @@ class CaptchaService:
                     ipAddress=ipAddress,
                     userAgent=userAgent
                 )
+
+                usageStatsRepo = UsageStatsRepository(self.db)
+                usageStatsRepo.incrementVerificationResult(
+                    session.keyId, CaptchaResult.TIMEOUT.value, int(latency.total_seconds() * 1000))
+
                 self.db.commit()
                 return CaptchaVerificationResponse(result="timeout", message="캡챠 세션이 만료되었습니다.")
 
@@ -162,6 +173,10 @@ class CaptchaService:
                 ipAddress=ipAddress,
                 userAgent=userAgent
             )
+
+            usageStatsRepo = UsageStatsRepository(self.db)
+            usageStatsRepo.incrementVerificationResult(
+                session.keyId, result.value, int(latency.total_seconds() * 1000))
 
             self.db.commit()
 
