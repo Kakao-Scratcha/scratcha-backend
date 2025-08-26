@@ -1,8 +1,7 @@
-# app/repositories/usage_stats_repo.py
-
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from datetime import date
+from sqlalchemy import func, case
+from datetime import date, timedelta
+from typing import Optional
 from fastapi import HTTPException, status
 
 from app.models.usage_stats import UsageStats
@@ -25,265 +24,105 @@ class UsageStatsRepository:
         """
         self.db = db
 
-    def getDailyUsageByUserId(self, userId: int, startDate: date, endDate: date) -> list:
+    def incrementTotalRequests(self, keyId: int):
         """
-        주어진 사용자와 날짜 범위에 대해 일별 사용량 통계를 조회합니다.
+        특정 API 키에 대한 오늘 날짜의 캡챠 총 요청 수를 1 증가시킵니다.
 
-        Args:
-            userId (int): 사용자의 ID.
-            startDate (date): 통계를 조회할 시작 날짜.
-            endDate (date): 통계를 조회할 종료 날짜.
-
-        Returns:
-            list: 조회된 일별 사용량 통계 객체의 리스트.
-        """
-        try:
-            # 1. `UsageStats` 테이블을 기준으로 `ApiKey`, `Application` 테이블과 조인합니다.
-            query = self.db.query(
-                UsageStats.date,
-                func.sum(UsageStats.captchaTotalRequests).label('captchaTotalRequests'),
-                func.sum(UsageStats.captchaSuccessCount).label('captchaSuccessCount'),
-                func.sum(UsageStats.captchaFailCount).label('captchaFailCount'),
-            ).join(
-                ApiKey, UsageStats.keyId == ApiKey.id
-            ).join(
-                Application, ApiKey.appId == Application.id
-            ).filter(
-                # 2. 특정 사용자의 ID와 주어진 날짜 범위로 필터링합니다.
-                Application.userId == userId,
-                UsageStats.date >= startDate,
-                UsageStats.date <= endDate
-            ).group_by(
-                # 3. 날짜별로 그룹화하여 통계를 집계합니다.
-                UsageStats.date
-            ).order_by(
-                # 4. 날짜순으로 정렬합니다.
-                UsageStats.date
-            )
-            # 5. 쿼리를 실행하고 모든 결과를 반환합니다.
-            return query.all()
-        except Exception as e:
-            # 6. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"일별 사용량 통계 조회 중 오류가 발생했습니다: {e}"
-            )
-
-    def getSummaryForPeriod(self, userId: int, startDate: date, endDate: date) -> tuple[int, int, int]:
-        """
-        특정 사용자와 날짜 범위에 대한 총 요청 수, 성공 수, 실패 수를 요약하여 반환합니다.
-
-        Args:
-            userId (int): 사용자의 ID.
-            startDate (date): 조회 시작 날짜.
-            endDate (date): 조회 종료 날짜.
-
-        Returns:
-            tuple[int, int, int]: (총 요청 수, 성공 수, 실패 수) 튜플.
-        """
-        try:
-            # 1. 특정 사용자의 주어진 기간 동안의 총 요청, 성공, 실패 수를 합산하는 쿼리를 작성합니다.
-            result = self.db.query(
-                func.sum(UsageStats.captchaTotalRequests),
-                func.sum(UsageStats.captchaSuccessCount),
-                func.sum(UsageStats.captchaFailCount)
-            ).join(
-                ApiKey, UsageStats.keyId == ApiKey.id
-            ).join(
-                Application, ApiKey.appId == Application.id
-            ).filter(
-                Application.userId == userId,
-                UsageStats.date >= startDate,
-                UsageStats.date <= endDate
-            ).first()
-        except Exception as e:
-            # 2. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"기간별 사용량 요약 조회 중 오류가 발생했습니다: {e}"
-            )
-
-        # 3. 쿼리 결과가 비어있거나 값이 None일 경우 0으로 처리합니다.
-        total = result[0] if result and result[0] is not None else 0
-        success = result[1] if result and result[1] is not None else 0
-        fail = result[2] if result and result[2] is not None else 0
-
-        # 4. 집계된 값을 튜플로 반환합니다.
-        return total, success, fail
-
-    def getTotalRequests(self, userId: int) -> int:
-        """
-        특정 사용자의 전체 기간에 대한 총 캡챠 요청 수를 반환합니다.
-
-        Args:
-            userId (int): 사용자의 ID.
-
-        Returns:
-            int: 전체 기간 동안의 총 캡챠 요청 수.
-        """
-        try:
-            # 1. 특정 사용자의 전체 캡챠 요청 수를 합산하는 쿼리를 작성합니다.
-            result = self.db.query(
-                func.sum(UsageStats.captchaTotalRequests)
-            ).join(
-                ApiKey, UsageStats.keyId == ApiKey.id
-            ).join(
-                Application, ApiKey.appId == Application.id
-            ).filter(
-                Application.userId == userId
-            ).scalar()
-        except Exception as e:
-            # 2. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"총 요청 수 조회 중 오류가 발생했습니다: {e}"
-            )
-        
-        # 3. 결과가 None이면 0을, 아니면 해당 값을 반환합니다.
-        return result if result is not None else 0
-
-    def getResultsCounts(self, userId: int) -> tuple[int, int]:
-        """
-        특정 사용자의 전체 기간에 대한 성공 및 실패한 캡챠 요청 수를 반환합니다.
-
-        Args:
-            userId (int): 사용자의 ID.
-
-        Returns:
-            tuple[int, int]: (성공 수, 실패 수) 튜플.
-        """
-        try:
-            # 1. 특정 사용자의 전체 성공 및 실패 캡챠 요청 수를 합산하는 쿼리를 작성합니다.
-            result = self.db.query(
-                func.sum(UsageStats.captchaSuccessCount),
-                func.sum(UsageStats.captchaFailCount)
-            ).join(
-                ApiKey, UsageStats.keyId == ApiKey.id
-            ).join(
-                Application, ApiKey.appId == Application.id
-            ).filter(
-                Application.userId == userId
-            ).first()
-        except Exception as e:
-            # 2. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"성공/실패 수 조회 중 오류가 발생했습니다: {e}"
-            )
-
-        # 3. 쿼리 결과가 비어있거나 값이 None일 경우 0으로 처리합니다.
-        success_count = result[0] if result and result[0] is not None else 0
-        fail_count = result[1] if result and result[1] is not None else 0
-
-        # 4. 집계된 값을 튜플로 반환합니다.
-        return success_count, fail_count
-
-    # --- API 키 기준 통계 --- #
-
-    def getSummaryForPeriodByApiKey(self, keyId: int, startDate: date, endDate: date) -> tuple[int, int, int]:
-        """
-        특정 API 키와 날짜 범위에 대한 총 요청 수, 성공 수, 실패 수를 요약하여 반환합니다.
+        오늘 날짜의 통계 데이터가 없으면 새로 생성하고, 있으면 카운트를 업데이트합니다.
 
         Args:
             keyId (int): API 키의 ID.
-            startDate (date): 조회 시작 날짜.
-            endDate (date): 조회 종료 날짜.
-
-        Returns:
-            tuple[int, int, int]: (총 요청 수, 성공 수, 실패 수) 튜플.
         """
         try:
-            # 1. 특정 API 키의 주어진 기간 동안의 총 요청, 성공, 실패 수를 합산하는 쿼리를 작성합니다.
-            result = self.db.query(
-                func.sum(UsageStats.captchaTotalRequests),
-                func.sum(UsageStats.captchaSuccessCount),
-                func.sum(UsageStats.captchaFailCount)
-            ).filter(
+            # 1. 오늘 날짜를 기준으로 해당 API 키의 통계 데이터를 조회합니다.
+            today = date.today()
+            usageStats = self.db.query(UsageStats).filter(
                 UsageStats.keyId == keyId,
-                UsageStats.date >= startDate,
-                UsageStats.date <= endDate
+                UsageStats.date == today
             ).first()
+
+            # 2. 통계 데이터가 존재하면 captchaTotalRequests를 1 증가시킵니다.
+            if usageStats:
+                usageStats.captchaTotalRequests += 1
+            # 3. 통계 데이터가 없으면 새로 생성하고 captchaTotalRequests를 1로 설정합니다.
+            else:
+                usageStats = UsageStats(
+                    keyId=keyId,
+                    date=today,
+                    captchaTotalRequests=1,
+                    captchaSuccessCount=0,
+                    captchaFailCount=0
+                )
+                self.db.add(usageStats)
+
+            # 4. 변경사항을 데이터베이스 세션에 반영합니다. (커밋은 서비스 레이어에서 수행)
+            self.db.flush([usageStats])
+
         except Exception as e:
-            # 2. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
+            # 5. 데이터베이스 작업 중 오류 발생 시 서버 오류를 반환합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"API 키별 기간 사용량 요약 조회 중 오류가 발생했습니다: {e}"
+                detail=f"캡챠 요청 수 업데이트 중 오류가 발생했습니다: {e}"
             )
 
-        # 3. 쿼리 결과가 비어있거나 값이 None일 경우 0으로 처리합니다.
-        total = result[0] if result and result[0] is not None else 0
-        success = result[1] if result and result[1] is not None else 0
-        fail = result[2] if result and result[2] is not None else 0
-
-        # 4. 집계된 값을 튜플로 반환합니다.
-        return total, success, fail
-
-    def getTotalRequestsByApiKey(self, keyId: int) -> int:
+    def incrementVerificationResult(self, keyId: int, result: str, latencyMs: int):
         """
-        특정 API 키의 전체 기간에 대한 총 캡챠 요청 수를 반환합니다.
+        특정 API 키에 대한 오늘 날짜의 캡챠 검증 결과를(성공/실패/타임아웃) 1 증가시키고,
+        평균 응답 시간 계산을 위한 총 지연 시간과 검증 횟수를 업데이트합니다.
 
         Args:
             keyId (int): API 키의 ID.
-
-        Returns:
-            int: 전체 기간 동안의 총 캡챠 요청 수.
+            result (str): 캡챠 검증 결과. ("success", "fail", "timeout")
+            latencyMs (int): 해당 검증의 지연 시간 (밀리초).
         """
         try:
-            # 1. 특정 API 키의 전체 캡챠 요청 수를 합산하는 쿼리를 작성합니다.
-            result = self.db.query(
-                func.sum(UsageStats.captchaTotalRequests)
-            ).filter(
-                UsageStats.keyId == keyId
-            ).scalar()
-        except Exception as e:
-            # 2. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"API 키별 총 요청 수 조회 중 오류가 발생했습니다: {e}"
-            )
-
-        # 3. 결과가 None이면 0을, 아니면 해당 값을 반환합니다.
-        return result if result is not None else 0
-
-    def getResultsCountsByApiKey(self, keyId: int) -> tuple[int, int]:
-        """
-        특정 API 키의 전체 기간에 대한 성공 및 실패한 캡챠 요청 수를 반환합니다.
-
-        Args:
-            keyId (int): API 키의 ID.
-
-        Returns:
-            tuple[int, int]: (성공 수, 실패 수) 튜플.
-        """
-        try:
-            # 1. 특정 API 키의 전체 성공 및 실패 캡챠 요청 수를 합산하는 쿼리를 작성합니다.
-            result = self.db.query(
-                func.sum(UsageStats.captchaSuccessCount),
-                func.sum(UsageStats.captchaFailCount)
-            ).filter(
-                UsageStats.keyId == keyId
+            today = date.today()
+            usageStats = self.db.query(UsageStats).filter(
+                UsageStats.keyId == keyId,
+                UsageStats.date == today
             ).first()
+
+            if not usageStats:
+                usageStats = UsageStats(
+                    keyId=keyId,
+                    date=today,
+                    captchaTotalRequests=0,
+                    captchaSuccessCount=0,
+                    captchaFailCount=0,
+                    captchaTimeoutCount=0,
+                    totalLatencyMs=0,
+                    verificationCount=0
+                )
+                self.db.add(usageStats)
+
+            if result == "success":
+                usageStats.captchaSuccessCount += 1
+            elif result == "fail":
+                usageStats.captchaFailCount += 1
+            elif result == "timeout":
+                usageStats.captchaTimeoutCount += 1
+
+            usageStats.totalLatencyMs += latencyMs
+            usageStats.verificationCount += 1
+            usageStats.avgResponseTimeMs = usageStats.totalLatencyMs / usageStats.verificationCount
+            
+            self.db.flush([usageStats])
+
         except Exception as e:
-            # 2. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"API 키별 성공/실패 수 조회 중 오류가 발생했습니다: {e}"
+                detail=f"캡챠 검증 결과 업데이트 중 오류가 발생했습니다: {e}"
             )
 
-        # 3. 쿼리 결과가 비어있거나 값이 None일 경우 0으로 처리합니다.
-        success_count = result[0] if result and result[0] is not None else 0
-        fail_count = result[1] if result and result[1] is not None else 0
-
-        # 4. 집계된 값을 튜플로 반환합니다.
-        return success_count, fail_count
-
-    def getUsageDataLogs(self, userId: int = None, keyId: int = None, skip: int = 0, limit: int = 100) -> tuple[list, int]:
+    def getUsageDataLogs(self, userId: int = None, keyId: int = None, startDate: Optional[date] = None, endDate: Optional[date] = None, skip: int = 0, limit: int = 100) -> tuple[list, int]:
         """
         사용자 또는 API 키별 캡챠 사용량 로그를 페이지네이션하여 조회합니다.
 
         Args:
             userId (int, optional): 필터링할 사용자의 ID. Defaults to None.
             keyId (int, optional): 필터링할 API 키의 ID. Defaults to None.
+            startDate (Optional[date]): 조회 시작일. Defaults to None.
+            endDate (Optional[date]): 조회 종료일. Defaults to None.
             skip (int): 건너뛸 레코드 수 (페이지네이션용). Defaults to 0.
             limit (int): 가져올 최대 레코드 수 (페이지네이션용). Defaults to 100.
 
@@ -312,16 +151,96 @@ class UsageStatsRepository:
             if keyId:
                 base_query = base_query.filter(ApiKey.id == keyId)
 
-            # 4. 필터링된 전체 로그의 개수를 계산합니다.
+            # 4. 날짜 필터링을 적용합니다.
+            if startDate:
+                base_query = base_query.filter(CaptchaLog.created_at >= startDate)
+            if endDate:
+                # To include the entire end day, filter by less than the start of the next day
+                base_query = base_query.filter(CaptchaLog.created_at < endDate + timedelta(days=1))
+
+            # 5. 필터링된 전체 로그의 개수를 계산합니다.
             total_count = base_query.count()
-            # 5. 페이지네이션(skip, limit)을 적용하여 실제 로그 데이터를 조회합니다.
+            # 6. 페이지네이션(skip, limit)을 적용하여 실제 로그 데이터를 조회합니다.
             logs = base_query.offset(skip).limit(limit).all()
 
-            # 6. 로그 리스트와 전체 개수를 튜플로 반환합니다.
+            # 7. 로그 리스트와 전체 개수를 튜플로 반환합니다.
             return logs, total_count
         except Exception as e:
-            # 7. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
+            # 8. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"사용량 로그 데이터 조회 중 오류가 발생했습니다: {e}"
+            )
+
+    def getStatsFromLogs(self, startDate: date, endDate: date, userId: int = None, keyId: int = None):
+        """
+        captcha_log 테이블에서 직접 시간별 통계를 집계합니다. (daily period 용)
+        """
+        try:
+            # 시간별로 그룹화하기 위한 DATE_FORMAT 함수 사용 (MySQL 호환)
+            timePeriod = func.DATE_FORMAT(
+                CaptchaLog.created_at, '%Y-%m-%dT%H:00:00').label('date')
+
+            query = self.db.query(
+                timePeriod,
+                func.coalesce(func.count(CaptchaLog.id),
+                              0).label('totalRequests'),
+                func.coalesce(func.sum(
+                    case((CaptchaLog.result == 'success', 1), else_=0)), 0).label('successCount'),
+                func.coalesce(func.sum(
+                    case((CaptchaLog.result == 'fail', 1), else_=0)), 0).label('failCount'),
+                func.coalesce(func.sum(
+                    case((CaptchaLog.result == 'timeout', 1), else_=0)), 0).label('timeoutCount')
+            ).filter(CaptchaLog.created_at.between(f'{startDate} 00:00:00', f'{endDate} 23:59:59'))
+
+            if keyId:
+                query = query.filter(CaptchaLog.keyId == keyId)
+            elif userId:
+                query = query.join(ApiKey, CaptchaLog.keyId == ApiKey.id).join(
+                    Application, ApiKey.appId == Application.id).filter(Application.userId == userId)
+
+            return query.group_by(timePeriod).order_by(timePeriod).all()
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"로그 기반 일일 통계 조회 중 오류: {e}"
+            )
+
+    def getAggregatedStats(self, startDate: date, endDate: date, period: str, userId: int = None, keyId: int = None):
+        """
+        usage_stats 테이블에서 기간별 통계를 집계합니다. (weekly, monthly, yearly 용)
+        """
+        try:
+            # 기간별로 그룹화하기 위한 함수 설정 (MySQL 호환)
+            if period == 'yearly':
+                groupPeriod = func.DATE_FORMAT(
+                    UsageStats.date, '%Y-%m-01').label('date')
+            elif period == 'monthly' or period == 'weekly':
+                groupPeriod = func.DATE(UsageStats.date).label('date')
+            else:
+                raise ValueError("Invalid period type")
+
+            query = self.db.query(
+                groupPeriod,
+                func.coalesce(func.sum(UsageStats.captchaTotalRequests), 0).label(
+                    'totalRequests'),
+                func.coalesce(func.sum(UsageStats.captchaSuccessCount), 0).label(
+                    'successCount'),
+                func.coalesce(func.sum(UsageStats.captchaFailCount), 0).label(
+                    'failCount'),
+                func.coalesce(func.sum(UsageStats.captchaTimeoutCount), 0).label(
+                    'timeoutCount')
+            ).filter(UsageStats.date.between(startDate, endDate))
+
+            if keyId:
+                query = query.filter(UsageStats.keyId == keyId)
+            elif userId:
+                query = query.join(ApiKey, UsageStats.keyId == ApiKey.id).join(
+                    Application, ApiKey.appId == Application.id).filter(Application.userId == userId)
+
+            return query.group_by(groupPeriod).order_by(groupPeriod).all()
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"집계 기반 통계 조회 중 오류: {e}"
             )

@@ -1,6 +1,6 @@
 # backend/models/usage_stats.py
 
-from sqlalchemy import Column, Date, Integer, String, TEXT, DateTime, ForeignKey, func
+from sqlalchemy import Column, Date, Integer, String, TEXT, DateTime, ForeignKey, func, Float
 from sqlalchemy.orm import relationship
 import enum
 
@@ -49,7 +49,35 @@ class UsageStats(Base):
         Integer,
         nullable=False,
         default=0,
-        comment="성공 응답 수"
+        comment="실패 응답 수"
+    )
+    captchaTimeoutCount = Column(
+        "captcha_timeout_count",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="타임아웃 응답 수"
+    )
+    totalLatencyMs = Column(
+        "total_latency_ms",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="총 지연 시간 (ms)"
+    )
+    verificationCount = Column(
+        "verification_count",
+        Integer,
+        nullable=False,
+        default=0,
+        comment="총 검증 횟수"
+    )
+    avgResponseTimeMs = Column(
+        "avg_response_time_ms",
+        Float,
+        nullable=False,
+        default=0.0,
+        comment="평균 응답 시간 (ms)"
     )
     created_at = Column(
         "created_at",

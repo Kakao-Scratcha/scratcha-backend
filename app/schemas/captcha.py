@@ -13,12 +13,12 @@ class CaptchaProblemResponse(BaseModel):
     imageUrl: str = Field(
         ...,
         description="캡챠 이미지에 접근할 수 있는 API URL",
-        example="/api/captcha/image/123"
+        example="https://objectstorage.kr-central-2.kakaocloud.com/v1/1bb3c9ceb1db43928600b93b2a2b1d50/team2-bucket/quiz_images/low/quiz_bf62f24d-7ec9-49af-8b45-002ee448370d.webp"
     )
     prompt: str = Field(
         ...,
         description="사용자에게 제시되는 캡챠 프롬프트 메시지",
-        example="사진속의 동물 혹은 물건은?."
+        example="스크래치 후 정답을 선택하세요. 노이즈 59% 알파블랜드 28%"
     )
     options: List[str] = Field(
         ...,
