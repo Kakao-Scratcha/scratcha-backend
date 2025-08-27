@@ -4,17 +4,17 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
+from starlette.middleware.sessions import SessionMiddleware  # SessionMiddleware 추가
 from db.session import engine
-from sqladmin import Admin
 
 from app.routers import users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
-from app.admin.admin import UserAdmin, ApplicationAdmin, ApiKeyAdmin
+from app.admin.admin import setup_admin
 from app.admin.auth import AdminAuth
 
 
 app = FastAPI(
     title="Dashboard API",
-    description="API for user management, application, API keys, statistics, and billing.",
+    description="scratcha API 서버",
     version="0.1.0"
 )
 
@@ -29,13 +29,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     for error in exc.errors():
         field_name = str(error['loc'][-1])
         message = error['msg']
-        
+
         # 'Value error, ' 접두사 제거
         if error['type'] == 'value_error':
             message = message.removeprefix('Value error, ')
-            
+
         errors[field_name] = message
-    
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": "입력 값의 유효성 검사에 실패했습니다.", "errors": errors},
@@ -61,12 +61,15 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
+# SessionMiddleware 추가
+app.add_middleware(SessionMiddleware,
+                   secret_key="your-super-secret-key")  # 하드코딩된 시크릿 키
+
 # admin 페이지 호출
-authentication_backend = AdminAuth(secret_key="...")
-admin = Admin(app, engine, authentication_backend=authentication_backend)
-admin.add_view(UserAdmin)
-admin.add_view(ApplicationAdmin)
-admin.add_view(ApiKeyAdmin)
+authentication_backend = AdminAuth(
+    secret_key="your-super-secret-key")  # 하드코딩된 시크릿 키
+admin = setup_admin(app, engine)
+admin.authentication_backend = authentication_backend
 
 
 @app.get("/")
