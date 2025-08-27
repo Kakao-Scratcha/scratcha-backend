@@ -11,7 +11,7 @@ class StatisticsLog(BaseModel):
     key: str = Field(..., description="사용된 API 키",
                      example="a1b2c3d4-e5f6-7890-1234-567890abcdef")
     date: str = Field(..., description="캡챠가 호출된 시간 (문제 생성 시간)",
-                           example="2024-08-21")
+                      example="2024-08-21")
     result: str = Field(..., description="캡챠 해결 결과 (예: 'success', 'fail', 'timeout')",
                         example="success")
     ratency: int = Field(..., description="응답 시간 (밀리초)", example=150)
@@ -45,3 +45,26 @@ class StatisticsLogResponse(BaseModel):
     total: int = Field(..., description="전체 로그 개수", example=100)
     page: int = Field(..., description="현재 페이지 번호", example=1)
     size: int = Field(..., description="페이지 당 항목 수", example=10)
+
+
+class RequestCountSummary(BaseModel):
+    """캡챠 요청 수 요약"""
+    currentCount: int = Field(..., description="현재 기간 호출량", example=1234)
+    previousCount: int = Field(..., description="이전 기간 호출량", example=1100)
+    rate: float = Field(..., description="이전 기간 대비 증감률 (%)", example=12.18)
+
+
+class RequestCountSummaryResponse(BaseModel):
+    """캡챠 요청 수 요약 응답"""
+    keyId: int | None = Field(...,
+                              description="조회한 API 키의 ID. 미지정 시 사용자 전체 합산", example=17)
+    periodType: str = Field(...,
+                            description="조회 기간 타입 (daily, weekly, monthly)", example="daily")
+    data: RequestCountSummary
+
+
+class RequestTotalResponse(BaseModel):
+    """전체 캡챠 요청 수 응답"""
+    keyId: int | None = Field(...,
+                              description="조회한 API 키의 ID. 미지정 시 사용자 전체 합산", example=17)
+    count: int
