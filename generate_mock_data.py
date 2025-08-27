@@ -114,33 +114,17 @@ class CaptchaProblem(Base):
 class CaptchaSession(Base):
     __tablename__ = "captcha_session"
     id = Column(Integer, primary_key=True)
-    keyId = Column("api_key_id", Integer, ForeignKey("api_key.id"), nullable=False)
-    captchaProblemId = Column("captcha_problem_id", Integer, ForeignKey("captcha_problem.id", ondelete="CASCADE"), nullable=False)
-    clientToken = Column("client_token", String(100), unique=True, nullable=False)
-    createdAt = Column("created_at", DateTime, nullable=False, server_default=func.now())
+    keyId = Column("api_key_id", Integer, ForeignKey(
+        "api_key.id"), nullable=False)
+    captchaProblemId = Column("captcha_problem_id", Integer, ForeignKey(
+        "captcha_problem.id", ondelete="CASCADE"), nullable=False)
+    clientToken = Column("client_token", String(100),
+                         unique=True, nullable=False)
+    createdAt = Column("created_at", DateTime,
+                       nullable=False, server_default=func.now())
 
 
 # --- Data Generation Logic ---
-
-def generate_captcha_problems(session, num_problems=10):
-    print(f"Generating {num_problems} CaptchaProblem entries...")
-    problems = []
-    for i in range(num_problems):
-        problem = CaptchaProblem(
-            imageUrl=f"https://mock-captcha-images.s3.amazonaws.com/image_{i+1}.png",
-            answer=f"answer{i+1}",
-            wrongAnswer1=f"wrong1_{i+1}",
-            wrongAnswer2=f"wrong2_{i+1}",
-            wrongAnswer3=f"wrong3_{i+1}",
-            prompt=f"Select the image with answer{i+1}",
-            difficulty=random.randint(1, 5),
-            expiresAt=datetime.now() + timedelta(days=random.randint(30, 365))
-        )
-        session.add(problem)
-        problems.append(problem)
-    session.commit()
-    print("CaptchaProblem generation complete.")
-    return problems
 
 def generate_captcha_sessions(session, api_keys, captcha_problems, num_sessions_per_key=5, start_date=None, end_date=None):
     print(f"Generating CaptchaSession entries for {len(api_keys)} API keys...")
@@ -150,14 +134,16 @@ def generate_captcha_sessions(session, api_keys, captcha_problems, num_sessions_
             if not captcha_problems:
                 print("No captcha problems available to create sessions.")
                 break
-            
+
             random_problem = random.choice(captcha_problems)
             if start_date and end_date:
                 time_diff = end_date - start_date
-                random_seconds = random.randint(0, int(time_diff.total_seconds()))
+                random_seconds = random.randint(
+                    0, int(time_diff.total_seconds()))
                 created_at = start_date + timedelta(seconds=random_seconds)
             else:
-                created_at = datetime.now() - timedelta(minutes=random.randint(1, 60)) # Fallback to original if dates not provided
+                created_at = datetime.now() - timedelta(minutes=random.randint(1, 60)
+                                                        )  # Fallback to original if dates not provided
             session_entry = CaptchaSession(
                 keyId=api_key.id,
                 captchaProblemId=random_problem.id,
@@ -228,15 +214,20 @@ def generate_mock_data(session, user_id=1, num_api_keys=5, days_for_captcha_log=
         api_keys.append(api_key)
     session.commit()  # Commit all new apps and api_keys
 
-    # 3. Generate CaptchaProblems
-    captcha_problems = generate_captcha_problems(session)
+    # 3. Load existing CaptchaProblems
+    captcha_problems = session.query(CaptchaProblem).all()
+    print(f"Found {len(captcha_problems)} existing CaptchaProblem entries.")
+    if not captcha_problems:
+        print("No CaptchaProblem entries found. Please populate the captcha_problem table first.")
+        return
 
     # Define date range for captcha related data
     end_log_date = datetime.now()
     start_log_date = end_log_date - timedelta(days=days_for_captcha_log)
 
     # 4. Generate CaptchaSessions
-    captcha_sessions = generate_captcha_sessions(session, api_keys, captcha_problems, num_sessions_per_key=600, start_date=start_log_date, end_date=end_log_date)
+    captcha_sessions = generate_captcha_sessions(
+        session, api_keys, captcha_problems, num_sessions_per_key=600, start_date=start_log_date, end_date=end_log_date)
 
     # 5. Generate UsageStats for the last year ---
     print("Generating UsageStats for the last year...")
@@ -299,11 +290,14 @@ def generate_mock_data(session, user_id=1, num_api_keys=5, days_for_captcha_log=
     # 6. Generate CaptchaLog (1:1 with CaptchaSession) ---
     print(f"Generating CaptchaLog entries (1:1 with CaptchaSession)...")
     for captcha_session_entry in captcha_sessions:
-        result_choice = random.choices(["success", "fail", "timeout"], weights=[0.9, 0.08, 0.02], k=1)[0]
+        result_choice = random.choices(["success", "fail", "timeout"], weights=[
+                                       0.9, 0.08, 0.02], k=1)[0]
         latency = random.randint(100, 500)
 
         # Ensure log created_at is after or equal to session created_at
-        log_created_at = captcha_session_entry.createdAt + timedelta(seconds=random.randint(0, 60)) # Slightly after session creation
+        log_created_at = captcha_session_entry.createdAt + \
+            timedelta(seconds=random.randint(0, 60)
+                      )  # Slightly after session creation
 
         log = CaptchaLog(
             keyId=captcha_session_entry.keyId,
@@ -318,7 +312,6 @@ def generate_mock_data(session, user_id=1, num_api_keys=5, days_for_captcha_log=
     session.commit()
     print("CaptchaLog generation complete (1:1 with CaptchaSession).")
     print("Mock data generation finished successfully!")
-    
 
 
 # --- Main Execution ---
@@ -328,7 +321,8 @@ if __name__ == "__main__":
     session = Session()
 
     try:
-        session.execute(sa.text("SET FOREIGN_KEY_CHECKS = 0;")) # Disable FK checks
+        # Disable FK checks
+        session.execute(sa.text("SET FOREIGN_KEY_CHECKS = 0;"))
 
         # Create tables if they don't exist (for a fresh DB)
         # Base.metadata.create_all(engine) # Uncomment if you want to create tables via this script
@@ -340,5 +334,6 @@ if __name__ == "__main__":
         session.rollback()
         print(f"An error occurred: {e}", file=sys.stderr)
     finally:
-        session.execute(sa.text("SET FOREIGN_KEY_CHECKS = 1;")) # Re-enable FK checks
+        # Re-enable FK checks
+        session.execute(sa.text("SET FOREIGN_KEY_CHECKS = 1;"))
         session.close()
