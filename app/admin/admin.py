@@ -26,6 +26,7 @@ class UserAdmin(ModelView, model=User):
     name = "User"
     name_plural = "Users"
     icon = "fa-solid fa-user"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
     column_default_sort = ("id", True)
 
 
@@ -45,6 +46,7 @@ class ApiKeyAdmin(ModelView, model=ApiKey):
     name = "API Key"
     name_plural = "API Keys"
     icon = "fa-solid fa-key"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
     column_default_sort = ("id", True)
 
 
@@ -62,6 +64,7 @@ class ApplicationAdmin(ModelView, model=Application):
     name = "Application"
     name_plural = "Applications"
     icon = "fa-solid fa-cube"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
     column_default_sort = ("id", True)
 
 
@@ -80,6 +83,7 @@ class CaptchaLogAdmin(ModelView, model=CaptchaLog):
     name = "Captcha Log"
     name_plural = "Captcha Logs"
     icon = "fa-solid fa-clipboard-list"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
     column_default_sort = ("id", True)
 
 
@@ -100,6 +104,7 @@ class CaptchaProblemAdmin(ModelView, model=CaptchaProblem):
     name = "Captcha Problem"
     name_plural = "Captcha Problems"
     icon = "fa-solid fa-puzzle-piece"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
     column_default_sort = ("id", True)
 
 
@@ -115,6 +120,7 @@ class CaptchaSessionAdmin(ModelView, model=CaptchaSession):
     name = "Captcha Session"
     name_plural = "Captcha Sessions"
     icon = "fa-solid fa-hourglass-half"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
     column_default_sort = ("id", True)
 
 
@@ -136,6 +142,7 @@ class UsageStatsAdmin(ModelView, model=UsageStats):
     name = "Usage Stats"
     name_plural = "Usage Stats"
     icon = "fa-solid fa-chart-bar"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
     column_default_sort = ("id", True)
 
 

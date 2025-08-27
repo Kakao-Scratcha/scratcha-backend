@@ -2,7 +2,8 @@
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime, timedelta
 import random
 from fastapi import HTTPException, status
 
@@ -123,14 +124,48 @@ class CaptchaRepository:
         """
         return self.db.query(CaptchaLog).filter(CaptchaLog.sessionId == session_id).first() is not None
 
-    def get_problem_by_id(self, problem_id: int) -> Optional[CaptchaProblem]:
+    def deleteUnloggedSessionsByApiKey(self, apiKeyId: int):
+        """
+        주어진 API 키에 대해 아직 로그되지 않은 캡챠 세션을 삭제합니다.
+        새로운 캡챠 요청이 들어올 때 이전 세션을 정리하여 1:1 트랜잭션을 유지합니다.
+
+        Args:
+            apiKeyId (int): API 키의 ID.
+        """
+        sessionsToDelete = self.db.query(CaptchaSession).filter(
+            CaptchaSession.keyId == apiKeyId,
+            # 해당 세션에 대한 CaptchaLog 기록이 없는 경우만 선택
+            ~self.db.query(CaptchaLog).filter(
+                CaptchaLog.sessionId == CaptchaSession.id).exists()
+        ).all()
+        for session in sessionsToDelete:
+            self.db.delete(session)
+
+    def getUnloggedTimedOutSessions(self, timeoutMinutes: int = 3) -> List[CaptchaSession]:
+        """
+        아직 로그되지 않았고 타임아웃된 캡챠 세션을 조회합니다.
+
+        Args:
+            timeoutMinutes (int): 타임아웃 기준 시간 (분).
+
+        Returns:
+            List[CaptchaSession]: 타임아웃된 캡챠 세션 목록.
+        """
+        timeoutThreshold = datetime.utcnow() - timedelta(minutes=timeoutMinutes)
+        return self.db.query(CaptchaSession).filter(
+            CaptchaSession.createdAt < timeoutThreshold,
+            ~self.db.query(CaptchaLog).filter(
+                CaptchaLog.sessionId == CaptchaSession.id).exists()
+        ).all()
+
+    def getProblemById(self, problemId: int) -> Optional[CaptchaProblem]:
         """
         문제 ID로 캡챠 문제를 조회합니다.
 
         Args:
-            problem_id (int): 조회할 캡챠 문제의 ID.
+            problemId (int): 조회할 캡챠 문제의 ID.
 
         Returns:
             Optional[CaptchaProblem]: 조회된 캡챠 문제 객체. 문제가 없으면 None을 반환합니다.
         """
-        return self.db.query(CaptchaProblem).filter(CaptchaProblem.id == problem_id).first()
+        return self.db.query(CaptchaProblem).filter(CaptchaProblem.id == problemId).first()

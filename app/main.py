@@ -6,16 +6,36 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
 from starlette.middleware.sessions import SessionMiddleware  # SessionMiddleware 추가
 from db.session import engine
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # APScheduler 임포트
+from contextlib import asynccontextmanager  # asynccontextmanager 임포트
 
 from app.routers import users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
 from app.admin.admin import setup_admin
 from app.admin.auth import AdminAuth
+from app.tasks.captchaTasks import checkAndLogCaptchaTimeouts  # 백그라운드 작업 임포트
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 서버 시작 시 실행될 코드
+    print("Server is starting up...")
+    # APScheduler 초기화 및 시작
+    scheduler = AsyncIOScheduler()
+    # 1분마다 checkAndLogCaptchaTimeouts 함수 실행
+    scheduler.add_job(checkAndLogCaptchaTimeouts, 'interval', minutes=1)
+    scheduler.start()
+    yield
+    # 서버 종료 시 실행될 코드
+    print("Server is shutting down...")
+    # APScheduler 종료
+    scheduler.shutdown()
 
 
 app = FastAPI(
     title="Dashboard API",
     description="scratcha API 서버",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan  # lifespan 컨텍스트 매니저 등록
 )
 
 
@@ -61,11 +81,14 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
-# SessionMiddleware 추가
+# SessionMiddleware를 추가하여 request.session을 사용할 수 있도록 합니다.
+# SQLAdmin의 인증 백엔드(AdminAuth)가 세션에 접근하기 위해 필요합니다.
+# secret_key는 세션 데이터를 암호화하는 데 사용됩니다. 실제 운영 환경에서는 환경 변수 등으로 관리해야 합니다.
 app.add_middleware(SessionMiddleware,
                    secret_key="your-super-secret-key")  # 하드코딩된 시크릿 키
 
-# admin 페이지 호출
+# SQLAdmin 관리자 인터페이스를 설정합니다.
+# setup_admin 함수를 통해 모든 ModelView가 등록됩니다.
 authentication_backend = AdminAuth(
     secret_key="your-super-secret-key")  # 하드코딩된 시크릿 키
 admin = setup_admin(app, engine)

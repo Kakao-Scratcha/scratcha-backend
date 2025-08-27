@@ -53,25 +53,28 @@ class CaptchaService:
             user.token -= 1
             self.db.add(user)
 
-            # 4. CaptchaRepository를 통해 활성화된 캡챠 문제 중 하나를 무작위로 선택합니다.
+            # 4. 기존에 로그되지 않은 세션이 있다면 삭제합니다. (1:1 트랜잭션 유지)
+            self.captchaRepo.deleteUnloggedSessionsByApiKey(apiKey.id)
+
+            # 5. CaptchaRepository를 통해 활성화된 캡챠 문제 중 하나를 무작위로 선택합니다.
             selectedProblem = self.captchaRepo.getRandomActiveProblem()
-            # 5. 유효한 캡챠 문제가 없는 경우 503 Service Unavailable 오류를 발생시킵니다.
+            # 6. 유효한 캡챠 문제가 없는 경우 503 Service Unavailable 오류를 발생시킵니다.
             if not selectedProblem:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="활성화된 캡차 문제가 없습니다."
                 )
 
-            # 6. 고유한 클라이언트 토큰을 생성합니다.
+            # 7. 고유한 클라이언트 토큰을 생성합니다.
             clientToken = str(uuid.uuid4())
-            # 7. CaptchaRepository를 통해 새로운 캡챠 세션을 생성하고 세션에 추가합니다. (아직 커밋되지 않음)
+            # 8. CaptchaRepository를 통해 새로운 캡챠 세션을 생성하고 세션에 추가합니다. (아직 커밋되지 않음)
             session = self.captchaRepo.createCaptchaSession(
                 keyId=apiKey.id,
                 captchaProblemId=selectedProblem.id,
                 clientToken=clientToken
             )
 
-            # 8. S3_BASE_URL 환경 변수를 가져와 전체 이미지 URL을 구성합니다.
+            # 9. S3_BASE_URL 환경 변수를 가져와 전체 이미지 URL을 구성합니다.
             s3BaseUrl = os.getenv("S3_BASE_URL")
             if not s3BaseUrl:
                 raise HTTPException(
@@ -82,17 +85,17 @@ class CaptchaService:
             # S3 이미지 키와 S3_BASE_URL을 조합하여 클라이언트가 직접 접근할 수 있는 전체 URL을 생성합니다.
             fullImageUrl = f"{s3BaseUrl}/{selectedProblem.imageUrl}"
 
-            # 9. usage_stats_repo를 사용하여 요청 카운트를 업데이트합니다.
+            # 10. usage_stats_repo를 사용하여 요청 카운트를 업데이트합니다.
             usageStatsRepo = UsageStatsRepository(self.db)
             usageStatsRepo.incrementTotalRequests(apiKey.id)
 
-            # 10. 사용자 토큰 차감 및 캡챠 세션 생성 등 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
+            # 11. 사용자 토큰 차감 및 캡챠 세션 생성 등 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
             self.db.commit()
 
-            # 11. 커밋된 세션 객체를 새로고침하여 최신 상태를 반영합니다.
+            # 12. 커밋된 세션 객체를 새로고침하여 최신 상태를 반영합니다.
             self.db.refresh(session)
 
-            # 12. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
+            # 13. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
             return CaptchaProblemResponse(
                 clientToken=session.clientToken,
                 imageUrl=fullImageUrl,  # S3 직접 이미지 URL을 반환
