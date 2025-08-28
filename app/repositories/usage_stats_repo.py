@@ -224,7 +224,7 @@ class UsageStatsRepository:
 
     def getAggregatedStats(self, keyIds: list[int], startDate: date, endDate: date, period: str):
         """
-        usage_stats 테이블에서 기간별(주간, 월간, 연간) 통계를 집계합니다.
+        usage_stats 테이블에서 기간별(일간, 월간) 통계를 집계합니다.
         미리 집계된 `usage_stats` 테이블을 사용하므로 `getStatsFromLogs`보다 성능상 이점이 있습니다.
 
         Args:
@@ -237,24 +237,29 @@ class UsageStatsRepository:
             list: 집계된 통계 데이터 리스트.
         """
         try:
-            # 1. 기간 타입에 따라 그룹화할 기준을 설정합니다. (MySQL 호환)
+            # 1. 기간 타입에 따라 그룹화할 기준을 설정합니다.
             if period == 'yearly':
-                groupPeriod = func.DATE_FORMAT(UsageStats.date, '%Y-01-01').label('date')
-            elif period == 'monthly':
-                groupPeriod = func.DATE_FORMAT(UsageStats.date, '%Y-%m-01').label('date')
-            elif period == 'weekly':
-                # WEEKDAY() 함수를 사용하여 주의 시작(월요일)을 계산합니다.
-                groupPeriod = func.DATE_SUB(UsageStats.date, func.weekday(UsageStats.date)).label('date')
+                # 연간 조회 시 월별로 그룹화합니다. (MySQL 호환)
+                groupPeriod = func.DATE_FORMAT(
+                    UsageStats.date, '%Y-%m-01').label('date')
+            elif period == 'monthly' or period == 'weekly':
+                # 월간 또는 주간 조회 시 일별로 그룹화합니다.
+                # usage_stats 테이블은 이미 일별 데이터이므로, date 컬럼을 그룹화 기준으로 사용합니다.
+                groupPeriod = UsageStats.date.label('date')
             else:
                 raise ValueError("Invalid period type for aggregation")
 
             # 2. 통계 집계를 위한 기본 쿼리를 작성합니다.
             query = self.db.query(
-                groupPeriod, # 그룹화된 기간
-                func.coalesce(func.sum(UsageStats.captchaTotalRequests), 0).label('totalRequests'),
-                func.coalesce(func.sum(UsageStats.captchaSuccessCount), 0).label('successCount'),
-                func.coalesce(func.sum(UsageStats.captchaFailCount), 0).label('failCount'),
-                func.coalesce(func.sum(UsageStats.captchaTimeoutCount), 0).label('timeoutCount')
+                groupPeriod,  # 그룹화된 기간
+                func.coalesce(func.sum(UsageStats.captchaTotalRequests),
+                             0).label('totalRequests'),
+                func.coalesce(func.sum(UsageStats.captchaSuccessCount),
+                             0).label('successCount'),
+                func.coalesce(func.sum(UsageStats.captchaFailCount),
+                             0).label('failCount'),
+                func.coalesce(func.sum(UsageStats.captchaTimeoutCount), 0).label(
+                    'timeoutCount')
             ).filter(UsageStats.date.between(startDate, endDate))
 
             # 3. 제공된 API 키 ID 목록이 없으면 빈 결과를 반환합니다.

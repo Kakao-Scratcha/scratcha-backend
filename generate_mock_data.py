@@ -6,7 +6,7 @@ import enum
 import sqlalchemy as sa
 import uuid
 
-from sqlalchemy import create_engine, Column, Integer, String, Date, DateTime, Float, ForeignKey, func, Enum, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Date, DateTime, Float, ForeignKey, func, Enum, Boolean, Text
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from dotenv import load_dotenv
@@ -36,92 +36,405 @@ class UserSubscription(enum.Enum):
     ENTERPRISE = "enterprise"
 
 
+class CaptchaResult(enum.Enum):
+    SUCCESS = "success"
+    FAIL = "fail"
+    TIMEOUT = "timeout"
+
+
 # --- Models (simplified for mock data generation) ---
 
 
 class User(Base):
     __tablename__ = "user"
-    id = Column(Integer, primary_key=True)
-    email = Column(String)
-    passwordHash = Column("password_hash", String)
-    userName = Column("user_name", String)
-    role = Column(Enum(UserRole), default=UserRole.USER)
-    plan = Column("subscription_plan", Enum(
-        UserSubscription), default=UserSubscription.FREE)
-    token = Column("api_token", Integer, default=1000)
-    createdAt = Column("created_at", DateTime, server_default=func.now())
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+    email = Column(
+        "email",
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    passwordHash = Column(
+        "password_hash",
+        String(255),
+        nullable=False,
+    )
+
+    userName = Column(
+        "user_name",
+        String(100),
+        nullable=True,
+    )
+
+    role = Column(
+        "role",
+        Enum(UserRole),
+        default=UserRole.USER,
+        nullable=False,
+    )
+
+    plan = Column(
+        "subscription_plan",
+        Enum(UserSubscription),
+        default=UserSubscription.FREE,
+        nullable=False,
+    )
+
+    token = Column(
+        "api_token",
+        Integer,
+        default=1000,
+        nullable=False,
+    )
+
+    createdAt = Column(
+        "created_at",
+        DateTime(timezone=True),
+        default=datetime.now,
+        nullable=False,
+    )
+
+    updatedAt = Column(
+        "updated_at",
+        DateTime(timezone=True),
+        default=datetime.now,
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    deletedAt = Column(
+        "deleted_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
 
 class Application(Base):
     __tablename__ = "application"
-    id = Column(Integer, primary_key=True)
-    appName = Column("app_name", String)
-    userId = Column("user_id", Integer, ForeignKey('user.id'))
-    user = relationship("User")
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    userId = Column(
+        "user_id",
+        Integer,
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    appName = Column(
+        "app_name",
+        String(100),
+        nullable=False,
+    )
+
+    description = Column(
+        "description",
+        Text,
+        nullable=True,
+    )
+
+    createdAt = Column(
+        "created_at",
+        DateTime(timezone=True),
+        default=datetime.now,
+        nullable=False,
+    )
+
+    updatedAt = Column(
+        "updated_at",
+        DateTime(timezone=True),
+        default=datetime.now,
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    deletedAt = Column(
+        "deleted_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
 
 class ApiKey(Base):
     __tablename__ = "api_key"
-    id = Column(Integer, primary_key=True)
-    key = Column(String)
-    appId = Column("application_id", Integer, ForeignKey('application.id'))
-    userId = Column("user_id", Integer, ForeignKey('user.id'))
-    isActive = Column("is_active", Boolean, default=True)
-    application = relationship("Application")
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    userId = Column(
+        "user_id",
+        Integer,
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    appId = Column(
+        "application_id",
+        Integer,
+        ForeignKey("application.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    key = Column(
+        "key",
+        String(255),
+        unique=True,
+        nullable=False,
+    )
+    isActive = Column(
+        "is_active",
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+
+    expiresAt = Column(
+        "expires_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    createdAt = Column(
+        "created_at",
+        DateTime(timezone=True),
+        default=datetime.now,
+        nullable=False,
+    )
+
+    updatedAt = Column(
+        "updated_at",
+        DateTime(timezone=True),
+        default=datetime.now,
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    deletedAt = Column(
+        "deleted_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
 
 class UsageStats(Base):
     __tablename__ = "usage_stats"
-    id = Column(Integer, primary_key=True)
-    keyId = Column("api_key_id", Integer, ForeignKey("api_key.id"))
-    date = Column(Date)
-    captchaTotalRequests = Column("captcha_total_requests", Integer)
-    captchaSuccessCount = Column("captcha_success_count", Integer)
-    captchaFailCount = Column("captcha_fail_count", Integer)
-    captchaTimeoutCount = Column("captcha_timeout_count", Integer)
-    totalLatencyMs = Column("total_latency_ms", Integer)
-    verificationCount = Column("verification_count", Integer)
-    avgResponseTimeMs = Column("avg_response_time_ms", Float)
-    created_at = Column(DateTime, server_default=func.now())
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+    keyId = Column(
+        "api_key_id",
+        Integer,
+        ForeignKey("api_key.id"),
+        nullable=False,
+    )
+    date = Column(
+        "date",
+        Date,
+        nullable=False,
+    )
+    captchaTotalRequests = Column(
+        "captcha_total_requests",
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    captchaSuccessCount = Column(
+        "captcha_success_count",
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    captchaFailCount = Column(
+        "captcha_fail_count",
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    captchaTimeoutCount = Column(
+        "captcha_timeout_count",
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    totalLatencyMs = Column(
+        "total_latency_ms",
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    verificationCount = Column(
+        "verification_count",
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    avgResponseTimeMs = Column(
+        "avg_response_time_ms",
+        Float,
+        nullable=False,
+        default=0.0,
+    )
+    created_at = Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.now,
+    )
 
 
 class CaptchaLog(Base):
     __tablename__ = "captcha_log"
-    id = Column(Integer, primary_key=True)
-    keyId = Column("api_key_id", Integer, ForeignKey("api_key.id"))
-    sessionId = Column("session_id", Integer)
-    ipAddress = Column("ip_address", String)
-    userAgent = Column("user_agent", String)
-    result = Column(String)  # "success", "fail", "timeout"
-    latency_ms = Column(Integer)
-    created_at = Column(DateTime, server_default=func.now())
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+    keyId = Column(
+        "api_key_id",
+        Integer,
+        ForeignKey("api_key.id"),
+        nullable=False,
+    )
+    sessionId = Column(
+        "session_id",
+        Integer,
+        ForeignKey("captcha_session.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    ipAddress = Column(
+        "ip_address",
+        String(45),
+    )
+    userAgent = Column(
+        "user_agent",
+        Text,
+    )
+    result = Column(
+        "result",
+        Enum(CaptchaResult),
+        nullable=False,
+    )
+    latency_ms = Column(
+        "latency_ms",
+        Integer,
+        nullable=False,
+    )
+    created_at = Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.now,
+    )
 
 
 class CaptchaProblem(Base):
     __tablename__ = "captcha_problem"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    imageUrl = Column("image_url", String, nullable=False)
-    answer = Column("answer", String(20), nullable=False)
-    wrongAnswer1 = Column("wrong_answer_1", String(20), nullable=False)
-    wrongAnswer2 = Column("wrong_answer_2", String(20), nullable=False)
-    wrongAnswer3 = Column("wrong_answer_3", String(20), nullable=False)
-    prompt = Column("prompt", String(255), nullable=False)
-    difficulty = Column("difficulty", Integer, nullable=False)
-    createdAt = Column("created_at", DateTime, server_default=func.now())
-    expiresAt = Column("expires_at", DateTime, nullable=False)
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+    imageUrl = Column(
+        "image_url",
+        Text,
+        nullable=False,
+    )
+    answer = Column(
+        "answer",
+        String(20),
+        nullable=False,
+    )
+    wrongAnswer1 = Column(
+        "wrong_answer_1",
+        String(20),
+        nullable=False,
+    )
+    wrongAnswer2 = Column(
+        "wrong_answer_2",
+        String(20),
+        nullable=False,
+    )
+    wrongAnswer3 = Column(
+        "wrong_answer_3",
+        String(20),
+        nullable=False,
+    )
+    prompt = Column(
+        "prompt",
+        String(255),
+        nullable=False,
+    )
+    difficulty = Column(
+        "difficulty",
+        Integer,
+        nullable=False,
+    )
+    createdAt = Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.now,
+    )
+    expiresAt = Column(
+        "expires_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
 
 
 class CaptchaSession(Base):
     __tablename__ = "captcha_session"
-    id = Column(Integer, primary_key=True)
-    keyId = Column("api_key_id", Integer, ForeignKey(
-        "api_key.id"), nullable=False)
-    captchaProblemId = Column("captcha_problem_id", Integer, ForeignKey(
-        "captcha_problem.id", ondelete="CASCADE"), nullable=False)
-    clientToken = Column("client_token", String(100),
-                         unique=True, nullable=False)
-    createdAt = Column("created_at", DateTime,
-                       nullable=False, server_default=func.now())
+
+    id = Column(
+        Integer,
+        primary_key=True,
+    )
+
+    keyId = Column(
+        "api_key_id",
+        Integer,
+        ForeignKey("api_key.id"),
+        nullable=False,
+    )
+
+    captchaProblemId = Column(
+        "captcha_problem_id",
+        Integer,
+        ForeignKey("captcha_problem.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    clientToken = Column(
+        "client_token",
+        String(100),
+        unique=True,
+        nullable=False,
+    )
+
+    createdAt = Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.now,
+    )
 
 
 # --- Data Generation Logic ---
