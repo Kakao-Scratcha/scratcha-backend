@@ -181,11 +181,7 @@ class UsageStatsService:
         # 4. 조회된 로그 데이터를 응답 스키마 형태로 변환합니다.
         items = []
         for log in logs:
-            log_date = log[3]
-            if periodType != 'daily':
-                log_date = log_date.strftime('%Y-%m-%d')
-            else:
-                log_date = log_date.strftime('%Y-%m-%d %H:%M:%S')
+            log_date = log[3].strftime('%Y-%m-%d %H:%M:%S')
 
             items.append(
                 StatisticsLog(
