@@ -35,6 +35,12 @@ class Settings:
     # 캡챠 타임아웃 설정 (분)
     CAPTCHA_TIMEOUT_MINUTES: int = 3
 
+    # S3 기본 URL
+    S3_BASE_URL: str = os.getenv("S3_BASE_URL", "http://localhost:9000/scratcha") # MinIO 기본 URL
+
+    # 데이터베이스 URL
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "mysql+pymysql://user:password@localhost:3306/db") # 개발용 기본값
+
     # 사용자 이름 정규식 패턴
     USER_NAME_REGEX_PATTERN: str = r"^[가-힣a-zA-Z0-9._-]+$" # re.compile은 사용하지 않고 패턴 문자열만 관리
 
