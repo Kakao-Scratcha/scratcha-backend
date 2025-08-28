@@ -3,6 +3,8 @@
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from datetime import datetime
+from app.core.config import settings
 
 from db.base import Base
 
@@ -51,22 +53,22 @@ class ApiKey(Base):
 
     expiresAt = Column(
         "expires_at",
-        DateTime,
+        DateTime(timezone=True),
         nullable=True,
         comment="만료 시각 : 0 >= 무제한, 1=1일, 7=7일, 30=30일 등"
     )
 
     createdAt = Column(
         "created_at",
-        DateTime,
-        server_default=func.now(),
+        DateTime(timezone=True),
+        default=lambda: datetime.now(settings.TIMEZONE),
         nullable=False,
         comment="생성 시각"
     )
 
     updatedAt = Column(
         "updated_at",
-        DateTime,
+        DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
@@ -75,7 +77,7 @@ class ApiKey(Base):
 
     deletedAt = Column(
         "deleted_at",
-        DateTime,
+        DateTime(timezone=True),
         nullable=True,
         comment="삭제 시각 (soft-delete)"
     )

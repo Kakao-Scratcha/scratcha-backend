@@ -3,6 +3,8 @@
 from sqlalchemy import Column, Date, Integer, String, TEXT, DateTime, ForeignKey, func, Float
 from sqlalchemy.orm import relationship
 import enum
+from datetime import datetime
+from app.core.config import settings
 
 
 from db.base import Base
@@ -81,9 +83,9 @@ class UsageStats(Base):
     )
     created_at = Column(
         "created_at",
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
+        default=lambda: datetime.now(settings.TIMEZONE),
         comment="레코드 생성 시각 (기본값으로 현재 시각 사용)"
     )
 

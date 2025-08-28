@@ -2,6 +2,8 @@
 
 from sqlalchemy import Column, Integer, String, TEXT, DateTime, func
 from sqlalchemy.orm import relationship
+from datetime import datetime
+from app.core.config import settings
 
 from db.base import Base
 
@@ -59,14 +61,14 @@ class CaptchaProblem(Base):
     )
     createdAt = Column(
         "created_at",
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
+        default=lambda: datetime.now(settings.TIMEZONE),
         comment="문제 생성 시각"
     )
     expiresAt = Column(
         "expires_at",
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         comment="문제 교체 시각 (만료일)"
 

@@ -1,5 +1,3 @@
-# services/application_service.py
-
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from typing import List, Optional
@@ -11,14 +9,7 @@ from app.repositories.api_key_repo import ApiKeyRepository
 from app.repositories.application_repo import ApplicationRepository
 from app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate, CountResponse
 from app.schemas.api_key import ApiKeyResponse
-
-# 사용자 구독 상태에 따른 최대 애플리케이션 개수 설정
-MAX_APPLICATIONS_PER_USER = {
-    "free": 1,
-    "starter": 3,
-    "pro": 5,
-    "enterprise": -1  # 무제한
-}
+from app.core.config import settings # settings 객체 임포트
 
 
 class ApplicationService:
@@ -77,8 +68,8 @@ class ApplicationService:
             ApplicationResponse: 생성된 애플리케이션과 API 키 정보를 포함하는 응답 객체.
         """
         try:
-            # 1. 사용자의 현재 구독 플랜에 따른 최대 애플리케이션 생성 개수를 확인합니다.
-            maxApps = MAX_APPLICATIONS_PER_USER.get(currentUser.plan.value)
+            # 1. 사용자의 현재 구독 플랜에 따른 최대 애플리케이션 생성 개수를 확인합니다。
+            maxApps = settings.MAX_APPLICATIONS_PER_USER.get(currentUser.plan.value)
 
             # 2. 유효하지 않은 구독 상태인 경우 오류를 발생시킵니다.
             if maxApps is None:
@@ -114,7 +105,7 @@ class ApplicationService:
             # 8. HTTP 예외는 그대로 다시 발생시킵니다.
             raise e
         except Exception as e:
-            # 9. 그 외 예외 발생 시 서버 오류를 반환합니다.
+            # 9. 그 외 예외 발생 시 서버 오류를 반환합니다。
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"애플리케이션 생성 중 오류가 발생했습니다: {e}"
@@ -161,7 +152,7 @@ class ApplicationService:
             CountResponse: 애플리케이션의 총 개수를 포함하는 응답 객체.
         """
         try:
-            # 1. ApplicationRepository를 통해 사용자의 애플리케이션 개수를 조회합니다.
+            # 1. ApplicationRepository를 통해 사용자의 애플리케이션 개수를 조회합니다。
             count = self.appRepo.getApplicationsCountByUserId(currentUser.id)
             # 2. 조회된 개수를 CountResponse 스키마로 래핑하여 반환합니다.
             return CountResponse(count=count)
@@ -184,7 +175,7 @@ class ApplicationService:
             ApplicationResponse: 조회된 애플리케이션과 API 키 정보를 포함하는 응답 객체.
         """
         try:
-            # 1. ApplicationRepository를 통해 애플리케이션을 조회합니다.
+            # 1. ApplicationRepository를 통해 애플리케이션을 조회합니다。
             app = self.appRepo.getApplicationByAppId(appId)
             # 2. ApiKeyRepository를 통해 해당 애플리케이션에 연결된 API 키를 조회합니다.
             key = self.apiKeyRepo.getKeyByAppId(appId)
@@ -277,7 +268,7 @@ class ApplicationService:
             # 키가 존재하면 삭제하고, 삭제된 키 객체를 받습니다.
             deletedKey = self.apiKeyRepo.deleteKey(key.id) if key else None
 
-            # 5. ApplicationRepository를 통해 애플리케이션을 소프트 삭제합니다.
+            # 5. ApplicationRepository를 통해 애플리케이션을 소프트 삭제합니다。
             deletedApp = self.appRepo.deleteApplication(appId)
 
             # 6. 삭제 처리된 애플리케이션과 API 키 정보를 매핑하여 반환합니다.

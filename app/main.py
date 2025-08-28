@@ -4,18 +4,35 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
+from starlette.middleware.sessions import SessionMiddleware  # SessionMiddleware 추가
 from db.session import engine
-from sqladmin import Admin
+from contextlib import asynccontextmanager  # asynccontextmanager 임포트
 
 from app.routers import users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
-from app.admin.admin import UserAdmin, ApplicationAdmin, ApiKeyAdmin
+from app.admin.admin import setup_admin
 from app.admin.auth import AdminAuth
+from app.core.config import settings  # settings 객체 임포트
+# Import scheduler functions
+from app.tasks.scheduler import start_scheduler, shutdown_scheduler
 
+# Define the lifespan context manager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup event
+    print("Starting scheduler...")
+    start_scheduler()
+    yield
+    # Shutdown event
+    print("Shutting down scheduler...")
+    shutdown_scheduler()
 
 app = FastAPI(
     title="Dashboard API",
-    description="API for user management, application, API keys, statistics, and billing.",
-    version="0.1.0"
+    description="scratcha API 서버",
+    version="0.1.0",
+    lifespan=lifespan  # Add lifespan to FastAPI app
 )
 
 
@@ -29,44 +46,39 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     for error in exc.errors():
         field_name = str(error['loc'][-1])
         message = error['msg']
-        
+
         # 'Value error, ' 접두사 제거
         if error['type'] == 'value_error':
             message = message.removeprefix('Value error, ')
-            
+
         errors[field_name] = message
-    
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": "입력 값의 유효성 검사에 실패했습니다.", "errors": errors},
     )
 
-# # 데이터베이스 테이블 생성 (첫 실행 시 필요)
-# # 프로덕션에서는 Alembic과 같은 마이그레이션 도구를 사용하는 것이 권장됩니다.
-# Base.metadata.create_all(bind=engine)
-
-# CORS 미들웨어 설정 (개발 환경용)
-origins = [
-    "http://localhost",
-    "http://localhost:3000",  # 프론트엔드 개발 서버 URL
-    "http://localhost:80",  # Nginx
-    "http://127.0.0.1:80",  # Nginx
-]
-
+# CORS 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
-# admin 페이지 호출
-authentication_backend = AdminAuth(secret_key="...")
-admin = Admin(app, engine, authentication_backend=authentication_backend)
-admin.add_view(UserAdmin)
-admin.add_view(ApplicationAdmin)
-admin.add_view(ApiKeyAdmin)
+# SessionMiddleware를 추가하여 request.session을 사용할 수 있도록 합니다.
+# SQLAdmin의 인증 백엔드(AdminAuth)가 세션에 접근하기 위해 필요합니다.
+# secret_key는 세션 데이터를 암호화하는 데 사용됩니다. 실제 운영 환경에서는 환경 변수 등으로 관리해야 합니다.
+app.add_middleware(SessionMiddleware,
+                   secret_key=settings.SESSION_SECRET_KEY)  # 하드코딩된 시크릿 키
+
+# SQLAdmin 관리자 인터페이스를 설정합니다.
+# setup_admin 함수를 통해 모든 ModelView가 등록됩니다.
+authentication_backend = AdminAuth(
+    secret_key=settings.SESSION_SECRET_KEY)  # 하드코딩된 시크릿 키
+admin = setup_admin(app, engine)
+admin.authentication_backend = authentication_backend
 
 
 @app.get("/")

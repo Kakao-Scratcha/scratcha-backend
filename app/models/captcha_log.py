@@ -3,6 +3,8 @@
 from sqlalchemy import Column, Enum, Integer, String, TEXT, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 import enum
+from datetime import datetime
+from app.core.config import settings
 
 
 from db.base import Base
@@ -61,9 +63,9 @@ class CaptchaLog(Base):
     )
     created_at = Column(
         "created_at",
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
+        default=lambda: datetime.now(settings.TIMEZONE),
         comment="문제 생성 시간"
     )
 
