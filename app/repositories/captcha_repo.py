@@ -10,6 +10,7 @@ from fastapi import HTTPException, status
 from app.models.captcha_problem import CaptchaProblem
 from app.models.captcha_session import CaptchaSession
 from app.models.captcha_log import CaptchaLog, CaptchaResult
+from app.core.config import settings # settings 객체 임포트
 
 
 class CaptchaRepository:
@@ -141,7 +142,7 @@ class CaptchaRepository:
         for session in sessionsToDelete:
             self.db.delete(session)
 
-    def getUnloggedTimedOutSessions(self, timeoutMinutes: int = 3) -> List[CaptchaSession]:
+    def getUnloggedTimedOutSessions(self, timeoutMinutes: int = settings.CAPTCHA_TIMEOUT_MINUTES) -> List[CaptchaSession]:
         """
         아직 로그되지 않았고 타임아웃된 캡챠 세션을 조회합니다.
 

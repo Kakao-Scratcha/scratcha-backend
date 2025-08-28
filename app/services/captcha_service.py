@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 import os
+from app.core.config import settings
 
 from app.models.api_key import ApiKey
 from app.models.user import User
@@ -146,7 +147,11 @@ class CaptchaService:
                     detail="이미 검증된 토큰입니다."
                 )
 
-            latency = datetime.utcnow() - session.createdAt
+            if session.createdAt.tzinfo is None:
+                session.createdAt = settings.TIMEZONE.localize(
+                    session.createdAt)
+
+            latency = datetime.now(settings.TIMEZONE) - session.createdAt
             if latency > timedelta(minutes=3):
                 self.captchaRepo.createCaptchaLog(
                     session=session,

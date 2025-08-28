@@ -1,11 +1,9 @@
 # app/core/security.py
-import os
-from dotenv import load_dotenv
 from fastapi.security import OAuth2PasswordBearer, HTTPBearer
 from fastapi import HTTPException, status, Depends, Header
 from passlib.context import CryptContext
 from jose import jwt, JWTError
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from db.session import get_db
@@ -13,16 +11,7 @@ from app.models.api_key import ApiKey
 from app.models.user import User, UserRole
 from app.repositories.api_key_repo import ApiKeyRepository
 from app.repositories.user_repo import UserRepository
-
-
-load_dotenv()
-
-
-# 환경 변수에서 비밀키, 알고리즘, 토큰 만료시간을 불러옵니다.
-SECRET_KEY = os.getenv(
-    "SECRET_KEY", "fallback-super-secret-key")  # JWT 서명에 사용되는 비밀키
-ALGORITHM = "HS256"  # JWT 서명 알고리즘
-ACCESS_TOKEN_EXPIRE_MINUTES = 30  # 액세스 토큰 기본 만료 시간(분)
+from app.core.config import settings # settings 객체 임포트
 
 
 # 비밀번호 해싱 및 검증을 위한 bcrypt 컨텍스트
@@ -44,22 +33,22 @@ def createAccessToken(data: dict, expires_delta: timedelta | None = None) -> str
     Returns:
         str: 생성된 JWT 문자열.
     """
-    # 1. 원본 데이터를 복사하여 페이로드(payload)를 생성합니다.
+    # 1. 원본 데이터를 복사하여 페이로드(payload)를 생성합니다。
     toEncode = data.copy()
 
     # 2. 토큰 만료 시간을 설정합니다.
     # expires_delta가 제공되면 해당 시간만큼, 아니면 기본 설정 시간만큼 현재 UTC 시간에 더합니다.
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(settings.TIMEZONE) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + \
-            timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(settings.TIMEZONE) + \
+            timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     # 3. 페이로드에 만료 시간('exp') 클레임을 추가합니다.
     toEncode.update({"exp": expire})
 
     # 4. 최종 페이로드를 사용하여 JWT를 인코딩합니다.
-    encodedJwt = jwt.encode(toEncode, SECRET_KEY, algorithm=ALGORITHM)
+    encodedJwt = jwt.encode(toEncode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     # 5. 인코딩된 JWT 문자열을 반환합니다.
     return encodedJwt
@@ -78,7 +67,7 @@ def decodeJwtToken(token: str) -> dict:
     try:
         # 1. JWT 라이브러리를 사용하여 토큰을 디코딩하고 검증합니다.
         # SECRET_KEY와 ALGORITHM을 사용하여 서명을 확인하고, 만료 시간을 자동으로 체크합니다.
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         # 2. 검증에 성공하면 페이로드를 반환합니다.
         return payload
     except JWTError:
@@ -151,7 +140,7 @@ def getCurrentUser(
     user_repo = UserRepository(db)
     # 3. 추출된 이메일로 데이터베이스에서 사용자를 조회합니다.
     user = user_repo.getUserByEmail(email)
-    # 4. 사용자를 찾을 수 없으면 오류를 발생시킵니다.
+    # 4. 사용자를 찾을 수 없으면 오류를 발생시킵니다。
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")

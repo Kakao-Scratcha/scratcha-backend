@@ -3,6 +3,8 @@
 from sqlalchemy import Column, String, DateTime, Enum, Integer, func
 from sqlalchemy.orm import relationship
 import enum
+from datetime import datetime
+from app.core.config import settings
 
 from db.base import Base
 
@@ -77,15 +79,15 @@ class User(Base):
 
     createdAt = Column(
         "created_at",
-        DateTime,
-        server_default=func.now(),
+        DateTime(timezone=True),
+        default=lambda: datetime.now(settings.TIMEZONE),
         nullable=False,
         comment="생성 시각"
     )
 
     updatedAt = Column(
         "updated_at",
-        DateTime,
+        DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
@@ -94,7 +96,7 @@ class User(Base):
 
     deletedAt = Column(
         "deleted_at",
-        DateTime,
+        DateTime(timezone=True),
         nullable=True,
         comment="삭제 시각 (soft-delete)"
     )

@@ -10,9 +10,7 @@ from app.models.user import User
 from app.repositories.user_repo import UserRepository
 from app.schemas.user import UserCreate, UserUpdate, UserPlanUpdate
 from app.models.user import User, UserRole
-
-
-USER_NAME_PATTERN = re.compile(r"^[가-힣a-zA-Z0-9]+$")
+from app.core.config import settings # settings 객체 임포트
 
 
 class UserService:
@@ -94,10 +92,10 @@ class UserService:
 
         # 3. 사용자 이름 유효성 검증 및 업데이트
         if userUpdate.userName is not None:
-            if not USER_NAME_PATTERN.match(userUpdate.userName):
+            if not re.match(settings.USER_NAME_REGEX_PATTERN, userUpdate.userName): # 정규식 패턴 사용
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="사용자 이름에는 한글, 영문, 숫자만 사용할 수 있습니다."
+                    detail="사용자 이름에는 한글, 영문, 숫자, 특수문자(.-_) 만 사용할 수 있습니다."
                 )
             if userUpdate.userName.isdigit():
                 raise HTTPException(
