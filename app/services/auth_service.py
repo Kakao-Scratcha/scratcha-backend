@@ -80,7 +80,7 @@ class AuthService:
             # 1. 토큰 만료 시간을 설정합니다.
             # expiresDelta가 제공되면 그 값을 사용하고, 그렇지 않으면 security 모듈에 정의된 기본 만료 시간(분)을 timedelta 객체로 변환하여 사용합니다.
             accessTokenExpires = expiresDelta or timedelta(
-                minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+                minutes=security.settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
             # 2. security 모듈의 createAccessToken 함수를 호출하여 JWT를 생성합니다.
             #    - 'sub' (subject) 클레임에 사용자의 이메일을 넣어 토큰의 주체를 식별합니다.

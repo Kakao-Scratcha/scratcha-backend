@@ -76,7 +76,7 @@ class CaptchaService:
             )
 
             # 9. S3_BASE_URL 환경 변수를 가져와 전체 이미지 URL을 구성합니다.
-            s3BaseUrl = os.getenv("S3_BASE_URL")
+            s3BaseUrl = settings.S3_BASE_URL
             if not s3BaseUrl:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
