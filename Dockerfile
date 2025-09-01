@@ -31,6 +31,7 @@ COPY ./app ./app
 COPY ./db ./db
 COPY ./alembic.ini .
 COPY ./alembic ./alembic
+COPY ./logging.ini .
 
 # 파일 소유권을 non-root 사용자로 변경
 RUN chown -R appuser:appgroup /app
