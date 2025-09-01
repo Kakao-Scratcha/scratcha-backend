@@ -9,7 +9,7 @@ import secrets
 
 from app.models.application import Application
 
-from app.models.api_key import ApiKey
+from app.models.api_key import ApiKey, Difficulty
 
 
 class ApiKeyRepository:
@@ -22,7 +22,7 @@ class ApiKeyRepository:
         """
         self.db = db
 
-    def createKey(self, userId: int, appId: int, expiresPolicy: int = 0) -> ApiKey:
+    def createKey(self, userId: int, appId: int, expiresPolicy: int = 0, difficulty: Difficulty = Difficulty.MIDDLE) -> ApiKey:
         """
         특정 애플리케이션에 대한 새로운 API 키를 생성하고 데이터베이스에 저장합니다.
 
@@ -63,6 +63,7 @@ class ApiKeyRepository:
             appId=appId,
             key=new_key_str,
             expiresAt=expiresAt,
+            difficulty=difficulty,
             isActive=True  # 새로운 키는 기본적으로 활성화 상태입니다.
         )
 
@@ -297,3 +298,34 @@ class ApiKeyRepository:
                 ApiKey.deletedAt.is_(None)
             )
         ).first()
+
+    def updateKey(self, key: ApiKey, keyUpdate: "ApiKeyUpdate") -> ApiKey:
+        """
+        API 키 정보를 업데이트합니다.
+
+        Args:
+            key (ApiKey): 업데이트할 API 키 객체.
+            keyUpdate (ApiKeyUpdate): 업데이트할 정보가 담긴 스키마.
+
+        Returns:
+            ApiKey: 업데이트된 API 키 객체.
+        """
+        if keyUpdate.expiresPolicy is not None:
+            expiresAt = datetime.now() + timedelta(days=keyUpdate.expiresPolicy) if keyUpdate.expiresPolicy > 0 else None
+            key.expiresAt = expiresAt
+        
+        if keyUpdate.difficulty is not None:
+            key.difficulty = keyUpdate.difficulty
+
+        try:
+            self.db.add(key)
+            self.db.commit()
+            self.db.refresh(key)
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"API 키 업데이트 중 오류가 발생했습니다: {e}"
+            )
+
+        return key

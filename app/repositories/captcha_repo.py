@@ -11,6 +11,7 @@ from app.models.captcha_problem import CaptchaProblem
 from app.models.captcha_session import CaptchaSession
 from app.models.captcha_log import CaptchaLog, CaptchaResult
 from app.core.config import settings # settings 객체 임포트
+from app.models.api_key import Difficulty
 
 
 class CaptchaRepository:
@@ -23,7 +24,7 @@ class CaptchaRepository:
         """
         self.db = db
 
-    def getRandomActiveProblem(self) -> Optional[CaptchaProblem]:
+    def getRandomActiveProblem(self, difficulty: Optional[Difficulty] = None) -> Optional[CaptchaProblem]:
         """
         데이터베이스에서 활성화된 (만료되지 않은) 캡챠 문제 중 하나를 무작위로 선택하여 반환합니다.
 
@@ -32,9 +33,14 @@ class CaptchaRepository:
         """
         try:
             # 1. 현재 시간을 기준으로 아직 만료되지 않은 모든 캡챠 문제를 데이터베이스에서 조회합니다.
-            validProblems = self.db.query(CaptchaProblem).filter(
+            query = self.db.query(CaptchaProblem).filter(
                 CaptchaProblem.expiresAt > func.now()
-            ).all()
+            )
+
+            if difficulty is not None:
+                query = query.filter(CaptchaProblem.difficulty == difficulty.to_int())
+
+            validProblems = query.all()
         except Exception as e:
             # 2. 데이터베이스 조회 중 오류가 발생하면 서버 오류를 발생시킵니다.
             raise HTTPException(

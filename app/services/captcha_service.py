@@ -58,7 +58,8 @@ class CaptchaService:
             self.captchaRepo.deleteUnloggedSessionsByApiKey(apiKey.id)
 
             # 5. CaptchaRepository를 통해 활성화된 캡챠 문제 중 하나를 무작위로 선택합니다.
-            selectedProblem = self.captchaRepo.getRandomActiveProblem()
+            selectedProblem = self.captchaRepo.getRandomActiveProblem(
+                apiKey.difficulty)
             # 6. 유효한 캡챠 문제가 없는 경우 503 Service Unavailable 오류를 발생시킵니다.
             if not selectedProblem:
                 raise HTTPException(

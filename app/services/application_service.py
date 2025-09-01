@@ -9,7 +9,7 @@ from app.repositories.api_key_repo import ApiKeyRepository
 from app.repositories.application_repo import ApplicationRepository
 from app.schemas.application import ApplicationCreate, ApplicationResponse, ApplicationUpdate, CountResponse
 from app.schemas.api_key import ApiKeyResponse
-from app.core.config import settings # settings 객체 임포트
+from app.core.config import settings  # settings 객체 임포트
 
 
 class ApplicationService:
@@ -46,6 +46,7 @@ class ApplicationService:
                 id=key.id,
                 key=key.key,
                 isActive=key.isActive,
+                difficulty=key.difficulty,
                 expiresAt=key.expiresAt,
                 createdAt=key.createdAt,
                 updatedAt=key.updatedAt,
@@ -68,28 +69,21 @@ class ApplicationService:
             ApplicationResponse: 생성된 애플리케이션과 API 키 정보를 포함하는 응답 객체.
         """
         try:
-            # 1. 사용자의 현재 구독 플랜에 따른 최대 애플리케이션 생성 개수를 확인합니다。
-            maxApps = settings.MAX_APPLICATIONS_PER_USER.get(currentUser.plan.value)
+            # 1. 사용자가 생성할 수 있는 최대 애플리케이션 개수를 확인합니다.
+            maxApps = settings.MAX_APPLICATIONS_PER_USER
 
-            # 2. 유효하지 않은 구독 상태인 경우 오류를 발생시킵니다.
-            if maxApps is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="유효하지 않은 구독 상태입니다."
-                )
-
-            # 3. 현재 사용자가 생성한 애플리케이션의 개수를 조회합니다.
+            # 2. 현재 사용자가 생성한 애플리케이션의 개수를 조회합니다.
             currentAppsCount = self.appRepo.getApplicationsCountByUserId(
                 currentUser.id)
 
-            # 4. 최대 애플리케이션 개수를 초과하는 경우 예외 처리합니다.
-            if maxApps != -1 and currentAppsCount >= maxApps:
+            # 3. 최대 애플리케이션 개수를 초과하는 경우 예외 처리합니다.
+            if currentAppsCount >= maxApps:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"현재 구독 플랜({currentUser.plan.value})으로는 최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
+                    detail=f"최대 {maxApps}개의 애플리케이션만 생성할 수 있습니다."
                 )
 
-            # 5. ApplicationRepository를 통해 새로운 애플리케이션을 생성합니다.
+            # 4. ApplicationRepository를 통해 새로운 애플리케이션을 생성합니다.
             app = self.appRepo.createApplication(currentUser.id, appCreate)
 
             # 6. ApiKeyRepository를 통해 생성된 애플리케이션에 대한 API 키를 발급합니다.

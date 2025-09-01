@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from fastapi import HTTPException, status
 
-from app.models.user import User, UserSubscription
+from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 
 
@@ -134,33 +134,33 @@ class UserRepository:
         # 5. 수정된 User 객체를 반환합니다.
         return user
 
-    def updateUserPlan(self, user: User, new_plan: UserSubscription) -> User:
-        """
-        사용자의 구독 플랜을 업데이트합니다.
+    # def updateUserPlan(self, user: User, new_plan: UserSubscription) -> User:
+    #     """
+    #     사용자의 구독 플랜을 업데이트합니다.
 
-        Args:
-            user (User): 플랜을 수정할 기존 User 객체.
-            new_plan (UserSubscription): 새로운 구독 플랜 Enum 값.
+    #     Args:
+    #         user (User): 플랜을 수정할 기존 User 객체.
+    #         new_plan (UserSubscription): 새로운 구독 플랜 Enum 값.
 
-        Returns:
-            User: 플랜이 수정된 User 객체.
-        """
-        # 1. 사용자의 plan 속성을 새로운 플랜으로 변경합니다.
-        user.plan = new_plan
-        try:
-            # 2. 변경된 사항을 데이터베이스에 커밋합니다.
-            self.db.commit()
-            # 3. 데이터베이스로부터 최신 상태를 객체에 반영합니다.
-            self.db.refresh(user)
-        except Exception as e:
-            # 4. 오류 발생 시, 롤백하고 서버 오류를 발생시킵니다.
-            self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"사용자 구독 플랜 업데이트 중 오류가 발생했습니다: {e}"
-            )
-        # 5. 수정된 User 객체를 반환합니다.
-        return user
+    #     Returns:
+    #         User: 플랜이 수정된 User 객체.
+    #     """
+    #     # 1. 사용자의 plan 속성을 새로운 플랜으로 변경합니다.
+    #     user.plan = new_plan
+    #     try:
+    #         # 2. 변경된 사항을 데이터베이스에 커밋합니다.
+    #         self.db.commit()
+    #         # 3. 데이터베이스로부터 최신 상태를 객체에 반영합니다.
+    #         self.db.refresh(user)
+    #     except Exception as e:
+    #         # 4. 오류 발생 시, 롤백하고 서버 오류를 발생시킵니다.
+    #         self.db.rollback()
+    #         raise HTTPException(
+    #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #             detail=f"사용자 구독 플랜 업데이트 중 오류가 발생했습니다: {e}"
+    #         )
+    #     # 5. 수정된 User 객체를 반환합니다.
+    #     return user
 
     def deleteUser(self, user: User) -> User:
         """

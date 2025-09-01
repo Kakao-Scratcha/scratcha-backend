@@ -1,12 +1,28 @@
 # backend/models/api_key.py
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
 from app.core.config import settings
+import enum
 
 from db.base import Base
+
+
+class Difficulty(enum.Enum):
+    LOW = "low"
+    MIDDLE = "middle"
+    HIGH = "high"
+
+    def to_int(self) -> int:
+        if self == Difficulty.LOW:
+            return 0
+        elif self == Difficulty.MIDDLE:
+            return 1
+        elif self == Difficulty.HIGH:
+            return 2
+        return 1  # Default to middle
 
 
 class ApiKey(Base):
@@ -49,6 +65,14 @@ class ApiKey(Base):
         default=True,
         nullable=False,
         comment="키 활성 상태"
+    )
+
+    difficulty = Column(
+        "difficulty",
+        Enum(Difficulty),
+        default=Difficulty.MIDDLE,
+        nullable=False,
+        comment="캡챠 난이도"
     )
 
     expiresAt = Column(

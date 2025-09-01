@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from app.repositories.api_key_repo import ApiKeyRepository
 from app.models.api_key import ApiKey
 from app.models.user import User
-from app.schemas.api_key import ApiKeyResponse
+from app.schemas.api_key import ApiKeyResponse, ApiKeyUpdate
+from app.models.api_key import Difficulty
 
 
 class ApiKeyService:
@@ -19,7 +20,7 @@ class ApiKeyService:
         self.db = db
         self.apiKeyRepo = ApiKeyRepository(db)
 
-    def createKey(self, currentUser: User, appId: int, expiresPolicy: int = 0) -> ApiKey:
+    def createKey(self, currentUser: User, appId: int, expiresPolicy: int = 0, difficulty: Difficulty = Difficulty.MIDDLE) -> ApiKey:
         """
         특정 애플리케이션에 대한 새로운 API 키를 생성합니다.
 
@@ -44,7 +45,8 @@ class ApiKeyService:
             key: ApiKey = self.apiKeyRepo.createKey(
                 userId=currentUser.id,
                 appId=appId,
-                expiresPolicy=expiresPolicy
+                expiresPolicy=expiresPolicy,
+                difficulty=difficulty
             )
             # 3. 생성된 API 키 객체를 반환합니다.
             return key
@@ -219,4 +221,41 @@ class ApiKeyService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"API 키 비활성화 중 오류가 발생했습니다: {e}"
+            )
+
+    def updateKey(self, keyId: int, currentUser: User, apiKeyUpdate: ApiKeyUpdate) -> ApiKey:
+        """
+        API 키를 업데이트합니다.
+
+        Args:
+            keyId (int): 업데이트할 API 키의 ID.
+            currentUser (User): 현재 인증된 사용자 객체.
+            apiKeyUpdate (ApiKeyUpdate): 업데이트할 API 키의 데이터 (스키마).
+
+        Returns:
+            ApiKey: 업데이트된 ApiKey 객체.
+        """
+        try:
+            # 1. ApiKeyRepository를 통해 API 키를 조회합니다.
+            key = self.apiKeyRepo.getKeyByKeyId(keyId)
+
+            # 2. API 키가 없거나 현재 사용자의 소유가 아닌 경우 404 오류를 발생시킵니다.
+            if not key or key.userId != currentUser.id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="API 키를 찾을 수 없습니다."
+                )
+
+            # 3. ApiKeyRepository를 통해 API 키를 업데이트합니다.
+            updatedKey = self.apiKeyRepo.updateKey(key, apiKeyUpdate)
+            # 4. 업데이트된 API 키 객체를 반환합니다.
+            return updatedKey
+        except HTTPException as e:
+            # 5. HTTP 예외는 그대로 다시 발생시킵니다.
+            raise e
+        except Exception as e:
+            # 6. 그 외 예외 발생 시 서버 오류를 반환합니다.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"API 키 업데이트 중 오류가 발생했습니다: {e}"
             )
