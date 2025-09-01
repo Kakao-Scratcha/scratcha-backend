@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from db.session import get_db
-from app.schemas.user import UserCreate, UserResponse, UserUpdate, UserPlanUpdate
+from app.schemas.user import UserCreate, UserResponse, UserUpdate
 from app.services.user_service import UserService
 from app.core.security import getCurrentUser
 from app.models.user import User
@@ -153,32 +153,32 @@ def deleteUser(
     return deletedUser
 
 
-@router.patch(
-    "/{userId}/plan",
-    response_model=UserResponse,
-    status_code=status.HTTP_200_OK,
-    summary="사용자 플랜 업데이트",
-    description="특정 사용자의 구독 플랜을 업데이트합니다. (관리자 또는 해당 사용자만 가능)",
-)
-def updateUserPlan(
-    userId: int,
-    planUpdate: UserPlanUpdate,
-    currentUser: User = Depends(getCurrentUser),
-    userService: UserService = Depends(getUserService)
-):
-    """
-    특정 사용자의 구독 플랜을 업데이트합니다.
+# @router.patch(
+#     "/{userId}/plan",
+#     response_model=UserResponse,
+#     status_code=status.HTTP_200_OK,
+#     summary="사용자 플랜 업데이트",
+#     description="특정 사용자의 구독 플랜을 업데이트합니다. (관리자 또는 해당 사용자만 가능)",
+# )
+# def updateUserPlan(
+#     userId: int,
+#     planUpdate: UserPlanUpdate,
+#     currentUser: User = Depends(getCurrentUser),
+#     userService: UserService = Depends(getUserService)
+# ):
+#     """
+#     특정 사용자의 구독 플랜을 업데이트합니다.
 
-    Args:
-        userId (int): 플랜을 업데이트할 사용자의 ID.
-        planUpdate (UserPlanUpdate): 업데이트할 구독 플랜 정보 (스키마).
-        currentUser (User): `getCurrentUser` 의존성으로 주입된 현재 인증된 사용자 객체.
-        userService: UserService = Depends(getUserService)
+#     Args:
+#         userId (int): 플랜을 업데이트할 사용자의 ID.
+#         planUpdate (UserPlanUpdate): 업데이트할 구독 플랜 정보 (스키마).
+#         currentUser (User): `getCurrentUser` 의존성으로 주입된 현재 인증된 사용자 객체.
+#         userService: UserService = Depends(getUserService)
 
-    Returns:
-        UserResponse: 플랜이 업데이트된 사용자의 상세 정보.
-    """
-    # 1. 사용자 서비스의 구독 플랜 업데이트 메서드를 호출합니다.
-    updatedUser = userService.updateUserPlan(userId, planUpdate, currentUser)
-    # 2. 업데이트된 사용자 정보를 반환합니다.
-    return updatedUser
+#     Returns:
+#         UserResponse: 플랜이 업데이트된 사용자의 상세 정보.
+#     """
+#     # 1. 사용자 서비스의 구독 플랜 업데이트 메서드를 호출합니다.
+#     updatedUser = userService.updateUserPlan(userId, planUpdate, currentUser)
+#     # 2. 업데이트된 사용자 정보를 반환합니다.
+#     return updatedUser

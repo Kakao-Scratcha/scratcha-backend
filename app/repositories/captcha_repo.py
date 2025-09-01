@@ -11,6 +11,7 @@ from app.models.captcha_problem import CaptchaProblem
 from app.models.captcha_session import CaptchaSession
 from app.models.captcha_log import CaptchaLog, CaptchaResult
 from app.core.config import settings # settings 객체 임포트
+from app.models.api_key import Difficulty
 
 
 class CaptchaRepository:
@@ -23,7 +24,7 @@ class CaptchaRepository:
         """
         self.db = db
 
-    def getRandomActiveProblem(self) -> Optional[CaptchaProblem]:
+    def getRandomActiveProblem(self, difficulty: Optional[Difficulty] = None) -> Optional[CaptchaProblem]:
         """
         데이터베이스에서 활성화된 (만료되지 않은) 캡챠 문제 중 하나를 무작위로 선택하여 반환합니다.
 
@@ -32,9 +33,14 @@ class CaptchaRepository:
         """
         try:
             # 1. 현재 시간을 기준으로 아직 만료되지 않은 모든 캡챠 문제를 데이터베이스에서 조회합니다.
-            validProblems = self.db.query(CaptchaProblem).filter(
+            query = self.db.query(CaptchaProblem).filter(
                 CaptchaProblem.expiresAt > func.now()
-            ).all()
+            )
+
+            if difficulty is not None:
+                query = query.filter(CaptchaProblem.difficulty == difficulty.to_int())
+
+            validProblems = query.all()
         except Exception as e:
             # 2. 데이터베이스 조회 중 오류가 발생하면 서버 오류를 발생시킵니다.
             raise HTTPException(
@@ -49,7 +55,7 @@ class CaptchaRepository:
         # 4. 조회된 유효한 문제 목록에서 무작위로 하나를 선택하여 반환합니다.
         return random.choice(validProblems)
 
-    def createCaptchaSession(self, keyId: int, captchaProblemId: int, clientToken: str) -> CaptchaSession:
+    def createCaptchaSession(self, keyId: int, captchaProblemId: int, clientToken: str, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaSession:
         """
         새로운 캡챠 세션을 생성하고 데이터베이스 세션에 추가합니다.
         이 메소드는 세션에 객체를 추가할 뿐, 커밋(commit)은 직접 수행하지 않습니다.
@@ -58,6 +64,8 @@ class CaptchaRepository:
             keyId (int): 이 세션을 요청한 API 키의 ID.
             captchaProblemId (int): 사용자에게 제시된 캡챠 문제의 ID.
             clientToken (str): 이 세션을 식별하는 고유 클라이언트 토큰.
+            ipAddress (Optional[str]): 클라이언트의 IP 주소.
+            userAgent (Optional[str]): 클라이언트의 User-Agent 정보.
 
         Returns:
             CaptchaSession: 새로 생성된 CaptchaSession 객체.
@@ -67,7 +75,9 @@ class CaptchaRepository:
             captchaSession = CaptchaSession(
                 keyId=keyId,
                 captchaProblemId=captchaProblemId,
-                clientToken=clientToken
+                clientToken=clientToken,
+                ipAddress=ipAddress,
+                userAgent=userAgent
             )
             # 2. 생성된 객체를 데이터베이스 세션에 추가합니다.
             self.db.add(captchaSession)
@@ -92,7 +102,7 @@ class CaptchaRepository:
         """
         return self.db.query(CaptchaSession).filter(CaptchaSession.clientToken == clientToken).first()
 
-    def createCaptchaLog(self, session: CaptchaSession, result: CaptchaResult, latency_ms: int, ipAddress: Optional[str], userAgent: Optional[str]):
+    def createCaptchaLog(self, session: CaptchaSession, result: CaptchaResult, latency_ms: int):
         """
         캡챠 검증 결과를 로그로 기록합니다.
 
@@ -100,14 +110,10 @@ class CaptchaRepository:
             session (CaptchaSession): 검증이 완료된 캡챠 세션.
             result (CaptchaResult): 검증 결과 (성공, 실패, 타임아웃).
             latency_ms (int): 응답 시간 (밀리초).
-            ipAddress (Optional[str]): 클라이언트의 IP 주소.
-            userAgent (Optional[str]): 클라이언트의 User-Agent 정보.
         """
         log_entry = CaptchaLog(
             keyId=session.keyId,
             sessionId=session.id,
-            ipAddress=ipAddress,
-            userAgent=userAgent,
             result=result,
             latency_ms=latency_ms
         )

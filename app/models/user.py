@@ -14,11 +14,11 @@ class UserRole(enum.Enum):
     USER = "user"
 
 
-class UserSubscription(enum.Enum):
-    FREE = "free"
-    STARTER = "starter"
-    PRO = "pro"
-    ENTERPRISE = "enterprise"
+# class UserSubscription(enum.Enum):
+#     FREE = "free"
+#     STARTER = "starter"
+#     PRO = "pro"
+#     ENTERPRISE = "enterprise"
 
 
 class User(Base):
@@ -61,13 +61,13 @@ class User(Base):
         comment="사용자 권한"
     )
 
-    plan = Column(
-        "subscription_plan",
-        Enum(UserSubscription),
-        default=UserSubscription.FREE,
-        nullable=False,
-        comment="구독한 플랜"
-    )
+    # plan = Column(
+    #     "subscription_plan",
+    #     Enum(UserSubscription),
+    #     default=UserSubscription.FREE,
+    #     nullable=False,
+    #     comment="구독한 플랜"
+    # )
 
     token = Column(
         "api_token",

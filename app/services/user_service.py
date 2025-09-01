@@ -8,9 +8,9 @@ import re
 from app.core.security import getPasswordHash, verifyPassword
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
-from app.schemas.user import UserCreate, UserUpdate, UserPlanUpdate
+from app.schemas.user import UserCreate, UserUpdate
 from app.models.user import User, UserRole
-from app.core.config import settings # settings 객체 임포트
+from app.core.config import settings  # settings 객체 임포트
 
 
 class UserService:
@@ -92,16 +92,16 @@ class UserService:
 
         # 3. 사용자 이름 유효성 검증 및 업데이트
         if userUpdate.userName is not None:
-            if not re.match(settings.USER_NAME_REGEX_PATTERN, userUpdate.userName): # 정규식 패턴 사용
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="사용자 이름에는 한글, 영문, 숫자, 특수문자(.-_) 만 사용할 수 있습니다."
-                )
-            if userUpdate.userName.isdigit():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="사용자 이름은 숫자로만 구성될 수 없습니다."
-                )
+            # if not re.match(settings.USER_NAME_REGEX_PATTERN, userUpdate.userName):  # 정규식 패턴 사용
+            #     raise HTTPException(
+            #         status_code=status.HTTP_400_BAD_REQUEST,
+            #         detail="사용자 이름에는 한글, 영문, 숫자, 특수문자(.-_) 만 사용할 수 있습니다."
+            #     )
+            # if userUpdate.userName.isdigit():
+            #     raise HTTPException(
+            #         status_code=status.HTTP_400_BAD_REQUEST,
+            #         detail="사용자 이름은 숫자로만 구성될 수 없습니다."
+            #     )
             user.userName = userUpdate.userName
 
         # 4. 비밀번호 변경 로직
@@ -134,42 +134,42 @@ class UserService:
         # 6. 업데이트된 사용자 객체를 반환합니다.
         return updatedUser
 
-    def updateUserPlan(self, userId: int, planUpdate: UserPlanUpdate, currentUser: User) -> User:
-        """
-        사용자의 구독 플랜을 업데이트합니다. 관리자 또는 본인만 가능합니다.
+    # def updateUserPlan(self, userId: int, planUpdate: UserPlanUpdate, currentUser: User) -> User:
+    #     """
+    #     사용자의 구독 플랜을 업데이트합니다. 관리자 또는 본인만 가능합니다.
 
-        Args:
-            userId (int): 플랜을 업데이트할 사용자의 ID.
-            planUpdate (UserPlanUpdate): 새로운 플랜 정보.
-            currentUser (User): 현재 인증된 사용자 객체.
+    #     Args:
+    #         userId (int): 플랜을 업데이트할 사용자의 ID.
+    #         planUpdate (UserPlanUpdate): 새로운 플랜 정보.
+    #         currentUser (User): 현재 인증된 사용자 객체.
 
-        Returns:
-            User: 플랜이 업데이트된 사용자 객체.
+    #     Returns:
+    #         User: 플랜이 업데이트된 사용자 객체.
 
-        Raises:
-            HTTPException: 사용자를 찾을 수 없거나, 권한이 없는 경우 발생합니다.
-        """
-        # 1. 플랜을 업데이트할 사용자를 조회합니다.
-        user = self.userRepo.getUserById(userId)
+    #     Raises:
+    #         HTTPException: 사용자를 찾을 수 없거나, 권한이 없는 경우 발생합니다.
+    #     """
+    #     # 1. 플랜을 업데이트할 사용자를 조회합니다.
+    #     user = self.userRepo.getUserById(userId)
 
-        # 2. 사용자가 존재하지 않으면 404 오류를 발생시킵니다.
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="사용자를 찾을 수 없습니다."
-            )
+    #     # 2. 사용자가 존재하지 않으면 404 오류를 발생시킵니다.
+    #     if not user:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_404_NOT_FOUND,
+    #             detail="사용자를 찾을 수 없습니다."
+    #         )
 
-        # 3. 권한 확인: 현재 사용자가 대상 사용자 본인이거나 관리자인지 확인합니다.
-        if currentUser.id != userId and currentUser.role != UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="플랜을 업데이트할 권한이 없습니다."
-            )
+    #     # 3. 권한 확인: 현재 사용자가 대상 사용자 본인이거나 관리자인지 확인합니다.
+    #     if currentUser.id != userId and currentUser.role != UserRole.ADMIN:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_403_FORBIDDEN,
+    #             detail="플랜을 업데이트할 권한이 없습니다."
+    #         )
 
-        # 4. UserRepository를 통해 사용자의 플랜을 업데이트합니다.
-        updated_user = self.userRepo.updateUserPlan(user, planUpdate.plan)
-        # 5. 업데이트된 사용자 객체를 반환합니다.
-        return updated_user
+    #     # 4. UserRepository를 통해 사용자의 플랜을 업데이트합니다.
+    #     updated_user = self.userRepo.updateUserPlan(user, planUpdate.plan)
+    #     # 5. 업데이트된 사용자 객체를 반환합니다.
+    #     return updated_user
 
     def deleteUser(self, userId: str) -> User:
         """

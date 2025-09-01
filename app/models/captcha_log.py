@@ -39,16 +39,6 @@ class CaptchaLog(Base):
         nullable=False,
         comment="연결된 캡챠 세션 ID"
     )
-    ipAddress = Column(
-        "ip_address",
-        String(45),
-        comment="요청자 IP"
-    )
-    userAgent = Column(
-        "user_agent",
-        TEXT,
-        comment="요청자 브라우저 정보"
-    )
     result = Column(
         "result",
         Enum(CaptchaResult),

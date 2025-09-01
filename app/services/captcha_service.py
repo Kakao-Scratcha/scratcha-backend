@@ -27,13 +27,15 @@ class CaptchaService:
         self.db = db
         self.captchaRepo = CaptchaRepository(db)
 
-    def generateCaptchaProblem(self, apiKey: ApiKey) -> CaptchaProblemResponse:
+    def generateCaptchaProblem(self, apiKey: ApiKey, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaProblemResponse:
         """
         새로운 캡챠 문제를 생성하고, 사용자 토큰을 차감하며, 캡챠 세션 정보를 반환하는 비즈니스 로직입니다.
         이 과정은 단일 트랜잭션으로 처리됩니다.
 
         Args:
             apiKey (ApiKey): 캡챠 문제를 요청한 API 키 객체.
+            ipAddress (Optional[str]): 클라이언트의 IP 주소.
+            userAgent (Optional[str]): 클라이언트의 User-Agent 정보.
 
         Returns:
             CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보 (클라이언트 토큰, 이미지 URL, 프롬프트, 선택지).
@@ -58,7 +60,8 @@ class CaptchaService:
             self.captchaRepo.deleteUnloggedSessionsByApiKey(apiKey.id)
 
             # 5. CaptchaRepository를 통해 활성화된 캡챠 문제 중 하나를 무작위로 선택합니다.
-            selectedProblem = self.captchaRepo.getRandomActiveProblem()
+            selectedProblem = self.captchaRepo.getRandomActiveProblem(
+                apiKey.difficulty)
             # 6. 유효한 캡챠 문제가 없는 경우 503 Service Unavailable 오류를 발생시킵니다.
             if not selectedProblem:
                 raise HTTPException(
@@ -72,7 +75,9 @@ class CaptchaService:
             session = self.captchaRepo.createCaptchaSession(
                 keyId=apiKey.id,
                 captchaProblemId=selectedProblem.id,
-                clientToken=clientToken
+                clientToken=clientToken,
+                ipAddress=ipAddress,
+                userAgent=userAgent
             )
 
             # 9. S3_BASE_URL 환경 변수를 가져와 전체 이미지 URL을 구성합니다.
@@ -156,9 +161,7 @@ class CaptchaService:
                 self.captchaRepo.createCaptchaLog(
                     session=session,
                     result=CaptchaResult.TIMEOUT,
-                    latency_ms=int(latency.total_seconds() * 1000),
-                    ipAddress=ipAddress,
-                    userAgent=userAgent
+                    latency_ms=int(latency.total_seconds() * 1000)
                 )
 
                 usageStatsRepo = UsageStatsRepository(self.db)
@@ -177,9 +180,7 @@ class CaptchaService:
             self.captchaRepo.createCaptchaLog(
                 session=session,
                 result=result,
-                latency_ms=int(latency.total_seconds() * 1000),
-                ipAddress=ipAddress,
-                userAgent=userAgent
+                latency_ms=int(latency.total_seconds() * 1000)
             )
 
             usageStatsRepo = UsageStatsRepository(self.db)

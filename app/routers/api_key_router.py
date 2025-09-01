@@ -6,7 +6,8 @@ from typing import List
 
 from db.session import get_db
 from app.services.api_key_service import ApiKeyService
-from app.schemas.api_key import ApiKeyResponse
+from app.schemas.api_key import ApiKeyResponse, ApiKeyUpdate
+from app.models.api_key import Difficulty
 from app.core.security import getCurrentUser
 from app.models.user import User
 
@@ -42,6 +43,8 @@ def createKey(
     appId: int = Body(..., embed=True, description="API 키를 생성할 애플리케이션의 ID"),
     expiresPolicy: int = Body(
         0, embed=True, description="API 키 만료 정책(일 단위, 0 또는 음수는 무제한)"),
+    difficulty: Difficulty = Body(
+        Difficulty.MIDDLE, embed=True, description="캡챠 난이도"),
     currentUser: User = Depends(getCurrentUser),
     apiKeyService: ApiKeyService = Depends(getApiKeyService)
 ):
@@ -58,7 +61,8 @@ def createKey(
         ApiKeyResponse: 생성된 API 키의 상세 정보.
     """
     # 1. 인증된 사용자와 요청된 정보를 바탕으로 API 키 생성 서비스를 호출합니다.
-    newApiKey = apiKeyService.createKey(currentUser, appId, expiresPolicy)
+    newApiKey = apiKeyService.createKey(
+        currentUser, appId, expiresPolicy, difficulty)
     # 2. 생성된 API 키 정보를 반환합니다.
     return newApiKey
 
@@ -204,3 +208,34 @@ def deleteKey(
     deletedKey = apiKeyService.deleteKey(keyId, currentUser)
     # 2. 변경된 키 정보를 반환합니다.
     return deletedKey
+
+
+@router.patch(
+    "/{keyId}",
+    response_model=ApiKeyResponse,
+    status_code=status.HTTP_200_OK,
+    summary="API 키 업데이트",
+    description="지정된 API 키의 정보를 업데이트합니다.",
+)
+def updateKey(
+    keyId: int,
+    apiKeyUpdate: ApiKeyUpdate,
+    currentUser: User = Depends(getCurrentUser),
+    apiKeyService: ApiKeyService = Depends(getApiKeyService)
+):
+    """
+    API 키 ID(`keyId`)에 해당하는 API 키의 정보를 업데이트합니다.
+
+    Args:
+        keyId (int): 업데이트할 API 키의 고유 ID.
+        apiKeyUpdate (ApiKeyUpdate): 업데이트할 정보.
+        currentUser (User): `getCurrentUser` 의존성으로 주입된 현재 인증된 사용자 객체.
+        apiKeyService (ApiKeyService): 의존성으로 주입된 API 키 서비스 객체.
+
+    Returns:
+        ApiKeyResponse: 업데이트된 API 키의 상세 정보.
+    """
+    # 1. API 키를 업데이트하는 서비스를 호출합니다.
+    updatedKey = apiKeyService.updateKey(keyId, currentUser, apiKeyUpdate)
+    # 2. 변경된 키 정보를 반환합니다.
+    return updatedKey

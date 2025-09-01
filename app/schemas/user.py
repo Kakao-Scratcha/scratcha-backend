@@ -8,7 +8,7 @@ import re
 
 from pydantic.alias_generators import to_camel
 
-from app.models.user import UserRole, UserSubscription
+from app.models.user import UserRole
 
 
 class UserCreate(BaseModel):  # 사용자 회원가입 스키마
@@ -164,8 +164,7 @@ class UserResponse(BaseModel):
                             example="user@example.com")
     userName: str = Field(..., description="사용자 이름", example="홍길동")
     role: UserRole = Field(..., description="사용자 역할", example="user")
-    plan: UserSubscription = Field(...,
-                                   description="사용자 구독 플랜", example="free")
+    # plan: UserSubscription = Field(...,description="사용자 구독 플랜", example="free")
     token: int = Field(..., description="사용자의 현재 토큰(크레딧) 잔액", example=1000)
     createdAt: datetime = Field(..., description="사용자 계정 생성 일시",
                                 example="2024-01-01T12:00:00")
@@ -180,9 +179,9 @@ class UserResponse(BaseModel):
         populate_by_name = True
 
 
-class UserPlanUpdate(BaseModel):
-    plan: UserSubscription = Field(
-        ...,
-        description="업데이트할 사용자 구독 플랜",
-        example="pro"
-    )
+# class UserPlanUpdate(BaseModel):
+#     plan: UserSubscription = Field(
+#         ...,
+#         description="업데이트할 사용자 구독 플랜",
+#         example="pro"
+#     )

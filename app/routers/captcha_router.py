@@ -28,6 +28,7 @@ router = APIRouter(
     description="유효한 API 키로 새로운 캡챠 문제(이미지, 선택지 등)와 문제 해결을 위한 고유 토큰을 발급받습니다."
 )
 def getCaptchaProblem(
+    request: Request,
     apiKey: ApiKey = Depends(getValidApiKey),
     db: Session = Depends(get_db)
 ):
@@ -44,7 +45,9 @@ def getCaptchaProblem(
         CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보 (클라이언트 토큰, 이미지 URL, 프롬프트, 선택지).
     """
     captchaService = CaptchaService(db)
-    newProblem = captchaService.generateCaptchaProblem(apiKey)
+    ipAddress = request.client.host
+    userAgent = request.headers.get("user-agent")
+    newProblem = captchaService.generateCaptchaProblem(apiKey, ipAddress, userAgent)
     return newProblem
 
 

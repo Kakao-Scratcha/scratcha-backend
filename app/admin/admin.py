@@ -16,7 +16,7 @@ class UserAdmin(ModelView, model=User):
         User.email,
         User.userName,
         User.role,
-        User.plan,
+        # User.plan,
         User.token,
         User.createdAt,
         User.updatedAt,
@@ -33,42 +33,11 @@ class UserAdmin(ModelView, model=User):
         User.email: "email",
         User.userName: "user_name",
         User.role: "role",
-        User.plan: "plan",
+        # User.plan: "plan",
         User.token: "token",
         User.createdAt: "created_at",
         User.updatedAt: "updated_at",
         User.deletedAt: "deleted_at",
-    }
-
-
-class ApiKeyAdmin(ModelView, model=ApiKey):
-    column_list = [
-        ApiKey.id,
-        ApiKey.userId,
-        ApiKey.appId,
-        ApiKey.key,
-        ApiKey.isActive,
-        ApiKey.expiresAt,
-        ApiKey.createdAt,
-        ApiKey.updatedAt,
-        ApiKey.deletedAt,
-    ]
-    column_details_list = column_list
-    name = "API Key"
-    name_plural = "API Keys"
-    icon = "fa-solid fa-key"
-    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
-    column_default_sort = ("id", True)
-    column_labels = {
-        ApiKey.id: "id",
-        ApiKey.userId: "user_id",
-        ApiKey.appId: "app_id",
-        ApiKey.key: "key",
-        ApiKey.isActive: "is_active",
-        ApiKey.expiresAt: "expires_at",
-        ApiKey.createdAt: "created_at",
-        ApiKey.updatedAt: "updated_at",
-        ApiKey.deletedAt: "deleted_at",
     }
 
 
@@ -99,13 +68,44 @@ class ApplicationAdmin(ModelView, model=Application):
     }
 
 
+class ApiKeyAdmin(ModelView, model=ApiKey):
+    column_list = [
+        ApiKey.id,
+        ApiKey.userId,
+        ApiKey.appId,
+        ApiKey.key,
+        ApiKey.isActive,
+        ApiKey.difficulty,
+        ApiKey.expiresAt,
+        ApiKey.createdAt,
+        ApiKey.updatedAt,
+        ApiKey.deletedAt,
+    ]
+    column_details_list = column_list
+    name = "API Key"
+    name_plural = "API Keys"
+    icon = "fa-solid fa-key"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
+    column_default_sort = ("id", True)
+    column_labels = {
+        ApiKey.id: "id",
+        ApiKey.userId: "user_id",
+        ApiKey.appId: "app_id",
+        ApiKey.key: "key",
+        ApiKey.isActive: "is_active",
+        ApiKey.difficulty: "difficulty",
+        ApiKey.expiresAt: "expires_at",
+        ApiKey.createdAt: "created_at",
+        ApiKey.updatedAt: "updated_at",
+        ApiKey.deletedAt: "deleted_at",
+    }
+
+
 class CaptchaLogAdmin(ModelView, model=CaptchaLog):
     column_list = [
         CaptchaLog.id,
         CaptchaLog.keyId,
         CaptchaLog.sessionId,
-        CaptchaLog.ipAddress,
-        CaptchaLog.userAgent,
         CaptchaLog.result,
         CaptchaLog.latency_ms,
         CaptchaLog.created_at,
@@ -120,8 +120,6 @@ class CaptchaLogAdmin(ModelView, model=CaptchaLog):
         CaptchaLog.id: "id",
         CaptchaLog.keyId: "key_id",
         CaptchaLog.sessionId: "session_id",
-        CaptchaLog.ipAddress: "ip_address",
-        CaptchaLog.userAgent: "user_agent",
         CaptchaLog.result: "result",
         CaptchaLog.latency_ms: "latency_ms",
         CaptchaLog.created_at: "created_at",
@@ -167,6 +165,8 @@ class CaptchaSessionAdmin(ModelView, model=CaptchaSession):
         CaptchaSession.keyId,
         CaptchaSession.captchaProblemId,
         CaptchaSession.clientToken,
+        CaptchaSession.ipAddress,
+        CaptchaSession.userAgent,
         CaptchaSession.createdAt,
     ]
     column_details_list = column_list
@@ -179,6 +179,8 @@ class CaptchaSessionAdmin(ModelView, model=CaptchaSession):
         CaptchaSession.id: "id",
         CaptchaSession.keyId: "key_id",
         CaptchaSession.captchaProblemId: "captcha_problem_id",
+        CaptchaSession.ipAddress: "ip_address",
+        CaptchaSession.userAgent: "user_agnet",
         CaptchaSession.clientToken: "client_token",
         CaptchaSession.createdAt: "created_at",
     }
@@ -222,8 +224,8 @@ class UsageStatsAdmin(ModelView, model=UsageStats):
 def setup_admin(app, engine: AsyncEngine):
     admin = Admin(app, engine)
     admin.add_view(UserAdmin)
-    admin.add_view(ApiKeyAdmin)
     admin.add_view(ApplicationAdmin)
+    admin.add_view(ApiKeyAdmin)
     admin.add_view(CaptchaProblemAdmin)
     admin.add_view(CaptchaSessionAdmin)
     admin.add_view(CaptchaLogAdmin)
