@@ -106,8 +106,6 @@ class CaptchaLogAdmin(ModelView, model=CaptchaLog):
         CaptchaLog.id,
         CaptchaLog.keyId,
         CaptchaLog.sessionId,
-        CaptchaLog.ipAddress,
-        CaptchaLog.userAgent,
         CaptchaLog.result,
         CaptchaLog.latency_ms,
         CaptchaLog.created_at,
@@ -122,8 +120,6 @@ class CaptchaLogAdmin(ModelView, model=CaptchaLog):
         CaptchaLog.id: "id",
         CaptchaLog.keyId: "key_id",
         CaptchaLog.sessionId: "session_id",
-        CaptchaLog.ipAddress: "ip_address",
-        CaptchaLog.userAgent: "user_agent",
         CaptchaLog.result: "result",
         CaptchaLog.latency_ms: "latency_ms",
         CaptchaLog.created_at: "created_at",
@@ -169,6 +165,8 @@ class CaptchaSessionAdmin(ModelView, model=CaptchaSession):
         CaptchaSession.keyId,
         CaptchaSession.captchaProblemId,
         CaptchaSession.clientToken,
+        CaptchaSession.ipAddress,
+        CaptchaSession.userAgent,
         CaptchaSession.createdAt,
     ]
     column_details_list = column_list
@@ -181,6 +179,8 @@ class CaptchaSessionAdmin(ModelView, model=CaptchaSession):
         CaptchaSession.id: "id",
         CaptchaSession.keyId: "key_id",
         CaptchaSession.captchaProblemId: "captcha_problem_id",
+        CaptchaSession.ipAddress: "ip_address",
+        CaptchaSession.userAgent: "user_agnet",
         CaptchaSession.clientToken: "client_token",
         CaptchaSession.createdAt: "created_at",
     }

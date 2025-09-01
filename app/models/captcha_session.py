@@ -41,6 +41,20 @@ class CaptchaSession(Base):
         comment="클라이언트에 전달할 고유 토큰 (1회용)"
     )
 
+    ipAddress = Column(
+        "ip_address",
+        String(50),
+        nullable=True,
+        comment="사용자 IP 주소"
+    )
+
+    userAgent = Column(
+        "user_agent",
+        String(255),
+        nullable=True,
+        comment="사용자 User-Agent"
+    )
+
     createdAt = Column(
         "created_at",
         DateTime(timezone=True),

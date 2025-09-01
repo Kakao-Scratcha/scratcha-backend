@@ -39,9 +39,7 @@ async def cleanup_expired_captcha_sessions():
             captcha_repo.createCaptchaLog(
                 session=session,
                 result=CaptchaResult.TIMEOUT,
-                latency_ms=int(latency.total_seconds() * 1000),
-                ipAddress="N/A", # 백그라운드 작업이므로 IP/UserAgent는 N/A
-                userAgent="N/A"
+                latency_ms=int(latency.total_seconds() * 1000)
             )
             # 사용량 통계 업데이트
             usage_stats_repo.incrementVerificationResult(
