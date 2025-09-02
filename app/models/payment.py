@@ -69,6 +69,12 @@ class Payment(Base):
         DateTime(timezone=True),
         comment="결제 승인 시간"
     )
+    canceledAt = Column(
+        "canceled_at",
+        DateTime(timezone=True),
+        nullable=True,
+        comment="결제 취소 시간"
+    )
     createdAt = Column(
         "created_at",
         DateTime(timezone=True),

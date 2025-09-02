@@ -1,23 +1,27 @@
 import base64
+from datetime import datetime
 import requests
 from fastapi import APIRouter, Depends, status, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
+from typing import Dict, Any
+import uuid
 
 from app.core.config import settings
 from app.core.security import getCurrentUser
 from app.models.user import User
+from app.models.payment import Payment
 from db.session import get_db
 from app.repositories.payment_repo import PaymentRepository
-from app.schemas.payment import PaymentCreate, PaymentConfirmRequest
+from app.schemas.payment import PaymentCreate, PaymentConfirmRequest, PaymentCancelRequest
 
-# TODO: 개발자센터에 로그인해서 내 결제위젯 연동 키 > 시크릿 키를 입력하세요. 시크릿 키는 외부에 공개되면 안돼요.
+# TODO: 개발자센터에 로그인해서 내 결제위젯 연동 키 > 시크릿 키를 입력하세요.
 # @docs https://docs.tosspayments.com/reference/using-api/api-keys
 SECRET_KEY = settings.TOSS_SECRET_KEY
 
 router = APIRouter(
     prefix="/payments",
-    tags=["payments"],
+    tags=["Payments"],
     responses={404: {"description": "Not found"}},
 )
 
@@ -25,29 +29,166 @@ router = APIRouter(
 def get_payment_repo(db: Session = Depends(get_db)) -> PaymentRepository:
     """
     FastAPI 의존성 주입을 통해 PaymentRepository 인스턴스를 생성하고 반환합니다.
-
-    Args:
-        db (Session, optional): `get_db` 의존성에서 제공하는 데이터베이스 세션.
-
-    Returns:
-        PaymentRepository: PaymentRepository의 인스턴스.
     """
     return PaymentRepository(db)
 
 
-@router.get("/checkout.html", summary="결제 페이지 로드")
-def checkout_page():
-    return FileResponse("pg/public/checkout.html")
+# @router.get("/checkout.html", summary="결제 페이지 로드")
+# def checkout_page():
+#     return FileResponse("pg/public/checkout.html")
 
 
-@router.get("/success.html", summary="성공 페이지 로드")
-def success_page():
-    return FileResponse("pg/public/success.html")
+# @router.get("/success.html", summary="성공 페이지 로드")
+# def success_page():
+#     return FileResponse("pg/public/success.html")
 
 
-@router.get("/fail.html", summary="실패 페이지 로드")
-def fail_page():
-    return FileResponse("pg/public/fail.html")
+# @router.get("/fail.html", summary="실패 페이지 로드")
+# def fail_page():
+#     return FileResponse("pg/public/fail.html")
+
+
+@router.get(
+    "/{paymentKey}",
+    summary="결제 정보 조회",
+    description="paymentKey를 사용하여 토스페이먼츠에서 결제 상세 정보를 조회하고, 우리 DB의 기록과 대조하여 반환합니다.",
+    response_model=Dict[str, Any]
+)
+def getPaymentDetails(
+    paymentKey: str,
+    current_user: User = Depends(getCurrentUser),
+    payment_repo: PaymentRepository = Depends(get_payment_repo),
+):
+    # 1. 우리 DB에서 결제 기록 조회 및 사용자 권한 확인
+    our_payment_record = payment_repo.db.query(Payment).filter(
+        Payment.paymentKey == paymentKey,
+        Payment.userId == current_user.id
+    ).first()
+
+    if not our_payment_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 결제 정보를 찾을 수 없거나 접근 권한이 없습니다."
+        )
+
+    # 2. 토스페이먼츠 API 인증을 위한 시크릿 키 준비
+    encrypted_secret_key = "Basic " + \
+        base64.b64encode((SECRET_KEY + ":").encode("utf-8")).decode("utf-8")
+
+    headers = {
+        "Authorization": encrypted_secret_key,
+        "Content-Type": "application/json",
+    }
+
+    try:
+        # 3. 토스페이먼츠 API 호출하여 상세 정보 조회
+        toss_api_url = f"https://api.tosspayments.com/v1/payments/{paymentKey}"
+        response = requests.get(toss_api_url, headers=headers)
+        response.raise_for_status()  # 2xx가 아니면 예외 발생
+
+        # 4. 토스페이먼츠로부터 받은 상세 결제 정보 반환
+        return response.json()
+
+    except requests.exceptions.HTTPError as e:
+        # 토스페이먼츠 API에서 에러 발생 시 해당 에러 반환
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"토스페이먼츠 API 조회 중 오류 발생: {e.response.json().get('message', str(e))}"
+        )
+    except Exception as e:
+        # 기타 예외 처리
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"결제 정보 조회 중 서버 오류 발생: {str(e)}"
+        )
+
+
+@router.post(
+    "/{paymentKey}/cancel",
+    summary="결제 취소",
+    description="paymentKey를 사용하여 승인된 결제를 취소합니다. 부분 취소도 가능합니다.",
+    response_model=Dict[str, Any]
+)
+def cancelPayment(
+    paymentKey: str,
+    cancel_request: PaymentCancelRequest,
+    current_user: User = Depends(getCurrentUser),
+    payment_repo: PaymentRepository = Depends(get_payment_repo),
+):
+    # 1. 우리 DB에서 결제 기록 조회 및 사용자 권한 확인
+    our_payment_record = payment_repo.db.query(Payment).filter(
+        Payment.paymentKey == paymentKey,
+        Payment.userId == current_user.id
+    ).first()
+
+    if not our_payment_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 결제 정보를 찾을 수 없거나 접근 권한이 없습니다."
+        )
+
+    # 2. 토스페이먼츠 API 인증을 위한 시크릿 키 준비
+    encrypted_secret_key = "Basic " + \
+        base64.b64encode((SECRET_KEY + ":").encode("utf-8")).decode("utf-8")
+
+    headers = {
+        "Authorization": encrypted_secret_key,
+        "Content-Type": "application/json",
+        "Idempotency-Key": str(uuid.uuid4())  # 멱등키 추가
+    }
+
+    payload = {
+        "cancelReason": cancel_request.cancelReason,
+    }
+    if cancel_request.cancelAmount is not None:
+        payload["cancelAmount"] = cancel_request.cancelAmount
+    if cancel_request.refundReceiveAccount is not None:
+        payload["refundReceiveAccount"] = cancel_request.refundReceiveAccount.dict()
+
+    try:
+        # 3. 토스페이먼츠 API 호출하여 결제 취소 요청
+        toss_api_url = f"https://api.tosspayments.com/v1/payments/{paymentKey}/cancel"
+        response = requests.post(toss_api_url, headers=headers, json=payload)
+        response.raise_for_status()  # 2xx가 아니면 예외 발생
+
+        toss_response_data = response.json()  # 응답 데이터를 먼저 할당
+
+        # 4. 우리 DB 업데이트 (상태 변경)
+        # Payment 객체의 status 필드를 참고하여 CANCELED 또는 PARTIAL_CANCELED로 변경
+        our_payment_record.status = toss_response_data.get('status')
+        # 부분 취소의 경우 amount를 balanceAmount로 업데이트
+        # balanceAmount는 취소 후 남은 금액을 의미합니다.
+        our_payment_record.amount = toss_response_data.get('balanceAmount')
+
+        # 취소 날짜 기록 (cancels 배열의 마지막 객체에서 canceledAt 추출)
+        cancels_list = toss_response_data.get('cancels')
+        if cancels_list and isinstance(cancels_list, list) and len(cancels_list) > 0:
+            last_cancel_obj = cancels_list[-1]
+            canceled_at_str = last_cancel_obj.get('canceledAt')
+            if canceled_at_str:
+                # ISO 8601 문자열을 datetime 객체로 변환
+                our_payment_record.canceledAt = datetime.fromisoformat(
+                    canceled_at_str.replace('Z', '+00:00'))
+
+        payment_repo.db.add(our_payment_record)
+        payment_repo.db.commit()
+        payment_repo.db.refresh(our_payment_record)
+
+        # 5. 토스페이먼츠로부터 받은 취소 응답 반환
+        return toss_response_data
+
+    except requests.exceptions.HTTPError as e:
+        # 토스페이먼츠 API에서 에러 발생 시 해당 에러 반환
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"토스페이먼츠 API 취소 중 오류 발생: {e.response.json().get('message', str(e))}"
+        )
+    except Exception as e:
+        # 기타 예외 처리
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"결제 취소 중 서버 오류 발생: {str(e)}"
+        )
 
 
 @router.post(
@@ -61,17 +202,6 @@ def confirmPayment(
     current_user: User = Depends(getCurrentUser),
     payment_repo: PaymentRepository = Depends(get_payment_repo),
 ):
-    """
-    토스페이먼츠 결제를 최종 승인하고 그 결과를 데이터베이스에 저장합니다.
-
-    Args:
-        data (PaymentConfirmRequest): 클라이언트에서 받은 결제 승인 정보 (paymentKey, orderId, amount).
-        current_user (User): 의존성으로 주입된 현재 로그인된 사용자 객체.
-        payment_repo (PaymentRepository): 의존성으로 주입된 결제 리포지토리 객체.
-
-    Returns:
-        JSONResponse: 토스페이먼츠로부터 받은 결제 승인 결과 원본.
-    """
     # 1. 토스페이먼츠 API 인증을 위한 시크릿 키를 준비합니다.
     #    - 시크릿 키 뒤에 콜론을 붙여 Base64로 인코딩하는 Basic 인증 방식을 사용합니다.
     encrypted_secret_key = "Basic " + \

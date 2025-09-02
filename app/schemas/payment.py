@@ -14,6 +14,7 @@ class PaymentBase(BaseModel):
     amount: int
     currency: Optional[str] = None
     approvedAt: Optional[datetime] = None
+    canceledAt: Optional[datetime] = None
 
 
 class PaymentCreate(PaymentBase):
@@ -36,3 +37,17 @@ class PaymentConfirmRequest(BaseModel):
     paymentKey: str
     orderId: str
     amount: int
+
+
+class RefundReceiveAccount(BaseModel):
+    """결제 취소 후 환불받을 계좌 정보 스키마"""
+    bank: str
+    accountNumber: str
+    holderName: str
+
+
+class PaymentCancelRequest(BaseModel):
+    """결제 취소 요청 시 클라이언트로부터 받는 데이터 모델"""
+    cancelReason: str
+    cancelAmount: Optional[int] = None
+    refundReceiveAccount: Optional[RefundReceiveAccount] = None
