@@ -1,10 +1,10 @@
 import base64
 from datetime import datetime
 import requests
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Query
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
-from typing import Dict, Any
+from typing import Dict, Any, List
 import uuid
 
 from app.core.config import settings
@@ -13,7 +13,10 @@ from app.models.user import User
 from app.models.payment import Payment
 from db.session import get_db
 from app.repositories.payment_repo import PaymentRepository
-from app.schemas.payment import PaymentCreate, PaymentConfirmRequest, PaymentCancelRequest
+from app.schemas.payment import (
+    PaymentCreate, PaymentConfirmRequest, PaymentCancelRequest,
+    PaymentHistoryResponse, PaymentHistoryItem
+)
 
 # TODO: 개발자센터에 로그인해서 내 결제위젯 연동 키 > 시크릿 키를 입력하세요.
 # @docs https://docs.tosspayments.com/reference/using-api/api-keys
@@ -46,6 +49,44 @@ def get_payment_repo(db: Session = Depends(get_db)) -> PaymentRepository:
 # @router.get("/fail.html", summary="실패 페이지 로드")
 # def fail_page():
 #     return FileResponse("pg/public/fail.html")
+
+@router.get("/history", response_model=PaymentHistoryResponse, summary="현재 사용자의 결제 내역 조회")
+def get_user_payment_history(
+    current_user: User = Depends(getCurrentUser),
+    payment_repo: PaymentRepository = Depends(get_payment_repo),
+    skip: int = Query(0, ge=0, description="건너뛸 항목 수"),
+    limit: int = Query(100, ge=1, le=100, description="가져올 최대 항목 수")
+):
+    """
+    현재 로그인된 사용자의 결제 내역을 최신순으로 조회합니다.
+    """
+    total = payment_repo.get_payments_count_by_user_id(user_id=current_user.id)
+    payments = payment_repo.get_payments_by_user_id(
+        user_id=current_user.id, skip=skip, limit=limit
+    )
+
+    # Payment 모델을 PaymentHistory 스키마로 변환
+    history_items = [
+        PaymentHistoryItem(
+            createdAt=p.createdAt,
+            approvedAt=p.approvedAt,
+            orderId=p.orderId,
+            status=p.status,
+            userName=p.user.userName,
+            amount=p.amount,
+            method=p.method,
+            orderName=p.orderName,
+        )
+        for p in payments
+    ]
+
+    return PaymentHistoryResponse(
+        userId=current_user.id,
+        total=total,
+        page=(skip // limit) + 1,
+        size=limit,
+        data=history_items
+    )
 
 
 @router.get(

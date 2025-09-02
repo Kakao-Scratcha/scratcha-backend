@@ -1,6 +1,6 @@
 # app/schemas/payment.py
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -29,7 +29,31 @@ class Payment(PaymentBase):
     createdAt: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+
+class PaymentHistoryItem(BaseModel):
+    """결제 내역의 개별 항목을 정의하는 스키마"""
+    createdAt: datetime = Field(..., description="주문일시")
+    approvedAt: Optional[datetime] = Field(None, description="결제일시")
+    orderId: str = Field(..., description="주문번호")
+    status: str = Field(..., description="결제상태")
+    userName: str = Field(..., description="구매자명")
+    amount: int = Field(..., description="결제액")
+    method: Optional[str] = Field(None, description="결제수단")
+    orderName: Optional[str] = Field(None, description="구매상품")
+
+    class Config:
+        from_attributes = True
+
+
+class PaymentHistoryResponse(BaseModel):
+    """결제 내역 조회 API 응답을 위한 스키마"""
+    userId: int = Field(..., description="사용자 ID")
+    data: List[PaymentHistoryItem] = Field(..., description="결제 내역 데이터 배열")
+    total: int = Field(..., description="전체 결제 내역 수")
+    page: int = Field(..., description="현재 페이지 번호")
+    size: int = Field(..., description="페이지 당 항목 수")
 
 
 class PaymentConfirmRequest(BaseModel):
@@ -51,3 +75,9 @@ class PaymentCancelRequest(BaseModel):
     cancelReason: str
     cancelAmount: Optional[int] = None
     refundReceiveAccount: Optional[RefundReceiveAccount] = None
+
+
+class PaymentWebhookPayload(BaseModel):
+    """토스페이먼츠 웹훅 이벤트 페이로드 스키마"""
+    eventType: str
+    data: dict
