@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 import os
+import random
 from app.core.config import settings
 
 from app.models.api_key import ApiKey
@@ -102,16 +103,19 @@ class CaptchaService:
             self.db.refresh(session)
 
             # 13. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
+            option_list = [
+                selectedProblem.answer,
+                selectedProblem.wrongAnswer1,
+                selectedProblem.wrongAnswer2,
+                selectedProblem.wrongAnswer3
+            ]
+            random.shuffle(option_list)
+
             return CaptchaProblemResponse(
                 clientToken=session.clientToken,
                 imageUrl=fullImageUrl,  # S3 직접 이미지 URL을 반환
                 prompt=selectedProblem.prompt,
-                options=[
-                    selectedProblem.answer,
-                    selectedProblem.wrongAnswer1,
-                    selectedProblem.wrongAnswer2,
-                    selectedProblem.wrongAnswer3
-                ]
+                options=option_list
             )
         except HTTPException as e:
             # 12. HTTP 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 해당 예외를 다시 발생시킵니다.
