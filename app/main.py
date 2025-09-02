@@ -1,14 +1,13 @@
-# backend/main.py
-
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware  # CORS 미들웨어 추가
+from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware  # SessionMiddleware 추가
+from fastapi.staticfiles import StaticFiles  # StaticFiles 임포트
 from db.session import engine
 from contextlib import asynccontextmanager  # asynccontextmanager 임포트
 
-from app.routers import users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
+from app.routers import payment_router, users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
 from app.admin.admin import setup_admin
 from app.admin.auth import AdminAuth
 from app.core.config import settings  # settings 객체 임포트
@@ -93,3 +92,8 @@ app.include_router(application_router.router, prefix="/api/dashboard")
 app.include_router(api_key_router.router, prefix="/api/dashboard")
 app.include_router(usage_stats_router.router, prefix="/api/dashboard")
 app.include_router(captcha_router.router, prefix="/api")
+app.include_router(payment_router.router)  # payment_router 추가
+
+# 정적 파일 서빙 설정
+app.mount("/payments", StaticFiles(directory="pg/public"),
+          name="payments_static")

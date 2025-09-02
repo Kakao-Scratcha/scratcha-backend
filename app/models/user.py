@@ -107,3 +107,8 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",  # 부모가 삭제될 때 자식도 함꼐 삭제
     )
+
+    payments = relationship(
+        "Payment",
+        back_populates="user"
+    )

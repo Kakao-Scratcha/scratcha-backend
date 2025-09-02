@@ -42,5 +42,8 @@ class Settings:
     # re.compile은 사용하지 않고 패턴 문자열만 관리
     USER_NAME_REGEX_PATTERN: str = r"^[가-힣a-zA-Z0-9._-]+$"
 
+    # 토스 페이먼츠 시크릿 키
+    TOSS_SECRET_KEY: str = os.getenv("TOSS_SECRET_KEY")
+
 
 settings = Settings()
