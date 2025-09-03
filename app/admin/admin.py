@@ -222,7 +222,8 @@ class UsageStatsAdmin(ModelView, model=UsageStats):
 
 
 def setup_admin(app, engine: AsyncEngine):
-    admin = Admin(app, engine, base_url="/admin", static_url="/admin/static")
+    admin = Admin(app, engine, base_url="/admin",
+                  static_url="https://api.scratcha.cloud/admin/static")
     admin.add_view(UserAdmin)
     admin.add_view(ApplicationAdmin)
     admin.add_view(ApiKeyAdmin)
