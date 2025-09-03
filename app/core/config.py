@@ -45,5 +45,12 @@ class Settings:
     # 토스 페이먼츠 시크릿 키
     TOSS_SECRET_KEY: str = os.getenv("TOSS_SECRET_KEY")
 
+    # 결제 정책 정의
+    ALLOWED_PAYMENT_PLANS = {
+        1000: 5000,
+        10000: 40000,
+        100000: 300000,
+    }
+
 
 settings = Settings()
