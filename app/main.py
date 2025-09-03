@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, status
+import logging.config
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,11 +18,12 @@ from app.tasks.scheduler import start_scheduler, shutdown_scheduler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup event
-    print("Starting scheduler...")
+    print("이벤트 스케줄러 시작...")
+    logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
     start_scheduler()
     yield
     # Shutdown event
-    print("Shutting down scheduler...")
+    print("이벤트 스케줄러 종료...")
     shutdown_scheduler()
 
 app = FastAPI(

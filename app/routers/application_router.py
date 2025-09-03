@@ -169,7 +169,8 @@ def updateApplication(
         ApplicationResponse: 수정된 애플리케이션의 상세 정보.
     """
     # 1. 애플리케이션 정보를 업데이트하는 서비스를 호출합니다.
-    updatedApp = appService.updateApplication(appId, currentUser, appUpdateSchema)
+    updatedApp = appService.updateApplication(
+        appId, currentUser, appUpdateSchema)
     # 2. 수정된 애플리케이션 정보를 반환합니다.
     return updatedApp
 
