@@ -22,7 +22,7 @@ class UsageStats(Base):
     keyId = Column(
         "api_key_id",
         Integer,
-        ForeignKey("api_key.id"),
+        ForeignKey("api_key.id", ondelete="CASCADE"),
         nullable=False,
         comment="통계의 기준이되는 API 키"
     )
