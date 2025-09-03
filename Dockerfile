@@ -43,4 +43,5 @@ USER appuser
 EXPOSE 8001
 
 # 컨테이너 시작 시 실행될 기본 명령어
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--log-config", "logging.ini"]
+# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--log-config", "logging.ini"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--log-config", "logging.ini", "--proxy-headers"]
