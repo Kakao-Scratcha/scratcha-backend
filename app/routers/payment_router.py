@@ -1,4 +1,5 @@
 import base64
+import re
 from datetime import datetime
 import requests
 from fastapi import APIRouter, Depends, status, HTTPException, Query
@@ -36,19 +37,20 @@ def get_payment_repo(db: Session = Depends(get_db)) -> PaymentRepository:
     return PaymentRepository(db)
 
 
-# @router.get("/checkout.html", summary="결제 페이지 로드")
-# def checkout_page():
-#     return FileResponse("pg/public/checkout.html")
+@router.get("/checkout.html", summary="결제 페이지 로드")
+def checkout_page():
+    return FileResponse("pg/public/checkout.html")
 
 
-# @router.get("/success.html", summary="성공 페이지 로드")
-# def success_page():
-#     return FileResponse("pg/public/success.html")
+@router.get("/success.html", summary="성공 페이지 로드")
+def success_page():
+    return FileResponse("pg/public/success.html")
 
 
-# @router.get("/fail.html", summary="실패 페이지 로드")
-# def fail_page():
-#     return FileResponse("pg/public/fail.html")
+@router.get("/fail.html", summary="실패 페이지 로드")
+def fail_page():
+    return FileResponse("pg/public/fail.html")
+
 
 @router.get("/history", response_model=PaymentHistoryResponse, summary="현재 사용자의 결제 내역 조회")
 def get_user_payment_history(
@@ -271,6 +273,42 @@ def confirmPayment(
         # 4. API 호출 성공 시, 응답받은 JSON 데이터를 변수에 저장합니다.
         payment_data = response.json()
 
+        # orderName에서 토큰 수 추출
+        order_name = payment_data.get("orderName")
+        match = re.search(r'(\d+)\s*토큰', order_name)
+        if not match:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="주문명에서 토큰 수를 추출할 수 없습니다. 'X 토큰 구매' 형식이어야 합니다."
+            )
+
+        try:
+            token_amount = int(match.group(1))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="유효하지 않은 토큰 수 형식입니다."
+            )
+
+        # 결제 금액 유효성 검사
+        total_amount = payment_data.get("totalAmount")
+        expected_amount = settings.ALLOWED_PAYMENT_PLANS.get(token_amount)
+        if expected_amount is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{token_amount} 토큰에 대한 유효한 결제 정책이 없습니다."
+            )
+
+        # 결제 금액 유효성 검사 (할인/쿠폰 적용 고려)
+        # 실제 결제 금액(total_amount)은 정책 금액(expected_amount)보다 작거나 같아야 합니다.
+        if total_amount > expected_amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"결제 금액이 정책 금액({expected_amount}원)보다 많습니다. {token_amount} 토큰에는 {expected_amount}원 이하로 결제되어야 합니다."
+            )
+        # Note: We are not checking for a minimum amount here, assuming any discount is valid.
+        # If a minimum payment is required, additional logic would be needed.
+
         # 5. 우리 데이터베이스에 저장할 결제 정보 스키마를 생성합니다.
         payment_to_create = PaymentCreate(
             userId=current_user.id,  # JWT 토큰에서 얻은 사용자 ID
@@ -287,7 +325,13 @@ def confirmPayment(
         # 6. 리포지토리를 통해 데이터베이스에 결제 정보를 기록합니다.
         payment_repo.create_payment(payment_in=payment_to_create)
 
-        # 7. 성공적으로 처리된 경우, 토스페이먼츠의 응답을 그대로 클라이언트에 반환합니다.
+        # 7. 사용자 토큰 업데이트
+        current_user.token += token_amount
+        payment_repo.db.add(current_user)
+        payment_repo.db.commit()
+        payment_repo.db.refresh(current_user)
+
+        # 8. 성공적으로 처리된 경우, 토스페이먼츠의 응답을 그대로 클라이언트에 반환합니다.
         return JSONResponse(content=payment_data, status_code=response.status_code)
 
     except requests.exceptions.HTTPError as e:
