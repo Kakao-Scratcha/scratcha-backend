@@ -77,7 +77,7 @@ authentication_backend = AdminAuth(
     secret_key=settings.SESSION_SECRET_KEY)  # 하드코딩된 시크릿 키
 admin = setup_admin(app, engine)
 admin.authentication_backend = authentication_backend
-admin.base_url = "/admin"
+# admin.base_url = "/admin"
 
 
 @app.get("/")
