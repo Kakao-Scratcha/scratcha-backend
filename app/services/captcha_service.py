@@ -58,7 +58,7 @@ class CaptchaService:
             self.db.add(user)
 
             # 4. 기존에 로그되지 않은 세션이 있다면 삭제합니다. (1:1 트랜잭션 유지)
-            self.captchaRepo.deleteUnloggedSessionsByApiKey(apiKey.id)
+            # self.captchaRepo.deleteUnloggedSessionsByApiKey(apiKey.id)
 
             # 5. CaptchaRepository를 통해 활성화된 캡챠 문제 중 하나를 무작위로 선택합니다.
             selectedProblem = self.captchaRepo.getRandomActiveProblem(
