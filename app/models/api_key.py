@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer, Enum
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+
 from datetime import datetime
 from app.core.config import settings
 import enum
@@ -93,8 +93,8 @@ class ApiKey(Base):
     updatedAt = Column(
         "updated_at",
         DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
+        default=lambda: datetime.now(settings.TIMEZONE),
+        onupdate=lambda: datetime.now(settings.TIMEZONE),
         nullable=False,
         comment="수정 시각"
     )
