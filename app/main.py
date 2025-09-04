@@ -35,6 +35,14 @@ app = FastAPI(
 )
 
 
+# 디버깅을 위해 모든 요청 헤더를 로깅하는 미들웨어
+@app.middleware("http")
+async def log_headers_middleware(request: Request, call_next):
+    logging.info(f"Request Headers: {request.headers}")
+    response = await call_next(request)
+    return response
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """
