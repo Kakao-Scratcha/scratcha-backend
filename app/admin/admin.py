@@ -8,6 +8,7 @@ from app.models.captcha_log import CaptchaLog
 from app.models.captcha_problem import CaptchaProblem
 from app.models.captcha_session import CaptchaSession
 from app.models.usage_stats import UsageStats
+from app.models.payment import Payment
 
 
 class UserAdmin(ModelView, model=User):
@@ -221,9 +222,45 @@ class UsageStatsAdmin(ModelView, model=UsageStats):
     }
 
 
+class PaymentAdmin(ModelView, model=Payment):
+    column_list = [
+        Payment.id,
+        Payment.userId,
+        Payment.paymentKey,
+        Payment.orderId,
+        Payment.orderName,
+        Payment.status,
+        Payment.method,
+        Payment.amount,
+        Payment.currency,
+        Payment.approvedAt,
+        Payment.canceledAt,
+        Payment.createdAt,
+    ]
+    column_details_list = column_list
+    name = "Payment"
+    name_plural = "Payments"
+    icon = "fa-solid fa-credit-card"
+    # 기본 정렬을 'id' 컬럼 기준으로 내림차순(True)으로 설정합니다.
+    column_default_sort = ("id", True)
+    column_labels = {
+        Payment.id: "id",
+        Payment.userId: "user_id",
+        Payment.paymentKey: "payment_key",
+        Payment.orderId: "order_id",
+        Payment.orderName: "order_name",
+        Payment.status: "status",
+        Payment.method: "method",
+        Payment.amount: "amount",
+        Payment.currency: "currency",
+        Payment.approvedAt: "approved_at",
+        Payment.canceledAt: "canceled_at",
+        Payment.createdAt: "created_at",
+    }
+
+
 def setup_admin(app, engine: AsyncEngine):
-    admin = Admin(app, engine, base_url="/admin",
-                  static_url="https://api.scratcha.cloud/admin/static")
+    admin = Admin(app, engine, base_url="/admin")
     admin.add_view(UserAdmin)
     admin.add_view(ApplicationAdmin)
     admin.add_view(ApiKeyAdmin)
@@ -231,4 +268,5 @@ def setup_admin(app, engine: AsyncEngine):
     admin.add_view(CaptchaSessionAdmin)
     admin.add_view(CaptchaLogAdmin)
     admin.add_view(UsageStatsAdmin)
+    admin.add_view(PaymentAdmin)
     return admin
