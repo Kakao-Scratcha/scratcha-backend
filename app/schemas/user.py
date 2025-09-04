@@ -31,9 +31,11 @@ class UserCreate(BaseModel):  # 사용자 회원가입 스키마
     @field_validator('email')
     @classmethod
     def validate_email(cls, v):
+        # 이메일 앞뒤 공백 제거 및 소문자 변환
+        v = v.strip().lower()
         if len(v) > 254:
             raise ValueError("이메일은 254자 이내로 입력해주세요.")
-        if not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", v):
+        if not re.match(r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$", v):
             raise ValueError("올바른 이메일 주소 형식이 아닙니다.")
         return v
 
@@ -59,7 +61,7 @@ class UserCreate(BaseModel):  # 사용자 회원가입 스키마
             raise ValueError("비밀번호는 8~64자 이내로 입력해주세요.")
         if v.isdigit():
             raise ValueError("비밀번호는 숫자만으로 구성할 수 없습니다.")
-        if not re.match(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:,./?~]+$', v):
+        if not re.match(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:,./?]+$', v):
             raise ValueError("비밀번호에 허용되지 않는 문자(공백 등)가 포함되어 있습니다.")
         return v
 
@@ -79,9 +81,11 @@ class UserLogin(BaseModel):  # 사용자 로그인 스키마
     @field_validator('email')
     @classmethod
     def validate_email(cls, v):
+        # 이메일 앞뒤 공백 제거 및 소문자 변환
+        v = v.strip().lower()
         if len(v) > 254:
             raise ValueError("이메일은 254자 이내로 입력해주세요.")
-        if not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", v):
+        if not re.match(r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$", v):
             raise ValueError("올바른 이메일 주소 형식이 아닙니다.")
         return v
 
@@ -92,7 +96,7 @@ class UserLogin(BaseModel):  # 사용자 로그인 스키마
             raise ValueError("비밀번호는 8~64자 이내로 입력해주세요.")
         if v.isdigit():
             raise ValueError("비밀번호는 숫자만으로 구성할 수 없습니다.")
-        if not re.match(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:,./?~]+$', v):
+        if not re.match(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:,./?]+$', v):
             raise ValueError("비밀번호에 허용되지 않는 문자(공백 등)가 포함되어 있습니다.")
         return v
 
@@ -153,7 +157,7 @@ class UserUpdate(BaseModel):  # 사용자 업데이트 스키마
             raise ValueError("비밀번호는 8~20자 이내로 입력해주세요.")
         if v.isdigit():
             raise ValueError("비밀번호는 숫자만으로 구성할 수 없습니다.")
-        if not re.match(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:,./?~]+$', v):
+        if not re.match(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:,./?]+$', v):
             raise ValueError("비밀번호에 허용되지 않는 문자(공백 등)가 포함되어 있습니다.")
         return v
 

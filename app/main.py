@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from db.session import engine
 from app.routers import payment_router, users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
@@ -38,22 +39,27 @@ app = FastAPI(
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """
     Pydantic 모델 유효성 검사 오류에 대한 커스텀 핸들러.
-    오류 메시지를 더 읽기 쉬운 형식으로 재구성합니다.
+    첫 번째 오류 메시지를 detail 필드에 직접 담아 응답합니다.
     """
-    errors = {}
-    for error in exc.errors():
-        field_name = str(error['loc'][-1])
-        message = error['msg']
+    error_list = exc.errors()
+    if not error_list:
+        # 오류 목록이 비어있는 드문 경우
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": "입력 값의 유효성 검사에 실패했습니다."},
+        )
 
-        # 'Value error, ' 접두사 제거
-        if error['type'] == 'value_error':
-            message = message.removeprefix('Value error, ')
+    # 첫 번째 오류 정보를 가져옵니다.
+    first_error = error_list[0]
+    message = first_error['msg']
 
-        errors[field_name] = message
+    # 'Value error, ' 접두사 제거
+    if first_error['type'] == 'value_error':
+        message = message.removeprefix('Value error, ')
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": "입력 값의 유효성 검사에 실패했습니다.", "errors": errors},
+        content={"detail": message},
     )
 
 # CORS 미들웨어 설정
@@ -63,6 +69,16 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 헤더 허용
+)
+
+# ProxyHeadersMiddleware는 리버스 프록시(예: Nginx, Caddy) 뒤에서 FastAPI 애플리케이션을 실행할 때 필요합니다.
+# 이 미들웨어는 'X-Forwarded-For' 및 'X-Forwarded-Proto'와 같은 헤더를 처리하여,
+# request.url의 scheme (http 또는 https)과 client host/ip를 올바르게 식별하도록 돕습니다.
+# 이를 통해 HTTPS 환경에서 발생하는 혼합 콘텐츠(Mixed Content) 오류를 해결할 수 있습니다.
+# trusted_hosts에 운영 도메인을 명시하여, 신뢰할 수 있는 프록시로부터의 요청만 허용합니다.
+app.add_middleware(
+    ProxyHeadersMiddleware,
+    trusted_hosts=["api.scratcha.cloud", "*.scratcha.cloud"]
 )
 
 # SessionMiddleware를 추가하여 request.session을 사용할 수 있도록 합니다.
