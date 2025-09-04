@@ -1,7 +1,9 @@
 # app/models/payment.py
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from datetime import datetime
+from app.core.config import settings
+
 from db.base import Base
 
 
@@ -78,7 +80,8 @@ class Payment(Base):
     createdAt = Column(
         "created_at",
         DateTime(timezone=True),
-        server_default=func.now(),
+        default=lambda: datetime.now(settings.TIMEZONE),
+        nullable=False,
         comment="레코드 생성 시간"
     )
 

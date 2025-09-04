@@ -1,6 +1,6 @@
 # backend/models/user.py
 
-from sqlalchemy import Column, String, DateTime, Enum, Integer, func
+from sqlalchemy import Column, String, DateTime, Enum, Integer
 from sqlalchemy.orm import relationship
 import enum
 from datetime import datetime
@@ -88,8 +88,8 @@ class User(Base):
     updatedAt = Column(
         "updated_at",
         DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
+        default=lambda: datetime.now(settings.TIMEZONE),
+        onupdate=lambda: datetime.now(settings.TIMEZONE),
         nullable=False,
         comment="수정 시각"
     )

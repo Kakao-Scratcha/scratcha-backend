@@ -37,19 +37,19 @@ def get_payment_repo(db: Session = Depends(get_db)) -> PaymentRepository:
     return PaymentRepository(db)
 
 
-@router.get("/checkout.html", summary="결제 페이지 로드")
-def checkout_page():
-    return FileResponse("pg/public/checkout.html")
+# @router.get("/checkout.html", summary="결제 페이지 로드")
+# def checkout_page():
+#     return FileResponse("pg/public/checkout.html")
 
 
-@router.get("/success.html", summary="성공 페이지 로드")
-def success_page():
-    return FileResponse("pg/public/success.html")
+# @router.get("/success.html", summary="성공 페이지 로드")
+# def success_page():
+#     return FileResponse("pg/public/success.html")
 
 
-@router.get("/fail.html", summary="실패 페이지 로드")
-def fail_page():
-    return FileResponse("pg/public/fail.html")
+# @router.get("/fail.html", summary="실패 페이지 로드")
+# def fail_page():
+#     return FileResponse("pg/public/fail.html")
 
 
 @router.get("/history", response_model=PaymentHistoryResponse, summary="현재 사용자의 결제 내역 조회")
