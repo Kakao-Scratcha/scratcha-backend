@@ -39,22 +39,27 @@ app = FastAPI(
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """
     Pydantic 모델 유효성 검사 오류에 대한 커스텀 핸들러.
-    오류 메시지를 더 읽기 쉬운 형식으로 재구성합니다.
+    첫 번째 오류 메시지를 detail 필드에 직접 담아 응답합니다.
     """
-    errors = {}
-    for error in exc.errors():
-        field_name = str(error['loc'][-1])
-        message = error['msg']
+    error_list = exc.errors()
+    if not error_list:
+        # 오류 목록이 비어있는 드문 경우
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": "입력 값의 유효성 검사에 실패했습니다."},
+        )
 
-        # 'Value error, ' 접두사 제거
-        if error['type'] == 'value_error':
-            message = message.removeprefix('Value error, ')
+    # 첫 번째 오류 정보를 가져옵니다.
+    first_error = error_list[0]
+    message = first_error['msg']
 
-        errors[field_name] = message
+    # 'Value error, ' 접두사 제거
+    if first_error['type'] == 'value_error':
+        message = message.removeprefix('Value error, ')
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": "입력 값의 유효성 검사에 실패했습니다.", "errors": errors},
+        content={"detail": message},
     )
 
 # CORS 미들웨어 설정
