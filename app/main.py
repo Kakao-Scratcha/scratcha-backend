@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
 
 from db.session import engine
 from app.routers import payment_router, users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
@@ -33,14 +33,6 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan  # Add lifespan to FastAPI app
 )
-
-
-# 디버깅을 위해 모든 요청 헤더를 로깅하는 미들웨어
-@app.middleware("http")
-async def log_headers_middleware(request: Request, call_next):
-    logging.info(f"Request Headers: {request.headers}")
-    response = await call_next(request)
-    return response
 
 
 @app.exception_handler(RequestValidationError)
@@ -77,16 +69,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 헤더 허용
-)
-
-# ProxyHeadersMiddleware는 리버스 프록시(예: Nginx, Caddy) 뒤에서 FastAPI 애플리케이션을 실행할 때 필요합니다.
-# 이 미들웨어는 'X-Forwarded-For' 및 'X-Forwarded-Proto'와 같은 헤더를 처리하여,
-# request.url의 scheme (http 또는 https)과 client host/ip를 올바르게 식별하도록 돕습니다.
-# 이를 통해 HTTPS 환경에서 발생하는 혼합 콘텐츠(Mixed Content) 오류를 해결할 수 있습니다.
-# trusted_hosts에 운영 도메인을 명시하여, 신뢰할 수 있는 프록시로부터의 요청만 허용합니다.
-app.add_middleware(
-    ProxyHeadersMiddleware,
-    trusted_hosts=["api.scratcha.cloud", "*.scratcha.cloud"]
 )
 
 # SessionMiddleware를 추가하여 request.session을 사용할 수 있도록 합니다.
