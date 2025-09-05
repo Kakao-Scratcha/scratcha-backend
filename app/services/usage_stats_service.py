@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+import math
 from fastapi import HTTPException, status
 from app.repositories.usage_stats_repo import UsageStatsRepository
 from app.repositories.api_key_repo import ApiKeyRepository
@@ -260,11 +261,14 @@ class UsageStatsService:
                 previousEnd = currentStart - timedelta(days=1)
                 previousStart = previousEnd.replace(day=1)
             else:
-                raise HTTPException(status_code=400, detail="Invalid periodType")
+                raise HTTPException(
+                    status_code=400, detail="Invalid periodType")
 
             # 3. 리포지토리를 통해 각 기간의 요청 수를 조회합니다.
-            currentCount = self.repo.getTotalRequestsForPeriod(keyIds, currentStart, currentEnd)
-            previousCount = self.repo.getTotalRequestsForPeriod(keyIds, previousStart, previousEnd)
+            currentCount = self.repo.getTotalRequestsForPeriod(
+                keyIds, currentStart, currentEnd)
+            previousCount = self.repo.getTotalRequestsForPeriod(
+                keyIds, previousStart, previousEnd)
 
             # 4. 이전 기간 대비 증감률(%)을 계산합니다.
             if previousCount > 0:
