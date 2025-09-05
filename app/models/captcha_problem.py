@@ -23,6 +23,11 @@ class CaptchaProblem(Base):
         nullable=False,
         comment="S3 이미지 URL"
     )
+    originImageUrl = Column(
+        "origin_image_url",
+        TEXT,
+        comment="이미지 원본 URL (적합하지 않은 이미지를 걸러내기 위한 용도)"
+    )
     answer = Column(
         "answer",
         String(20),
