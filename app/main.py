@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, HTTPException
 import logging.config
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,6 +62,27 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": message},
     )
+
+
+# 로거 설정
+logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    HTTPException이 발생했을 때, 오류 내용을 로깅하기 위한 커스텀 핸들러입니다.
+    """
+    logger.error(
+        f"HTTP 예외 발생: {request.method} {request.url.path} {exc.status_code} {exc.detail}"
+    )
+    # 기본 HTTPException 동작과 동일하게 JSON 응답을 반환합니다.
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
+
 
 # CORS 미들웨어 설정
 app.add_middleware(
