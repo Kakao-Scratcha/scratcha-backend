@@ -10,7 +10,7 @@ from starlette_prometheus import PrometheusMiddleware, metrics
 
 
 from db.session import engine
-from app.routers import payment_router, users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
+from app.routers import payment_router, users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router, contact_router
 from app.admin.admin import setup_admin
 from app.admin.auth import AdminAuth
 from app.core.config import settings
@@ -95,13 +95,22 @@ def read_root():
 
 
 # 라우터 등록
-app.include_router(users_router.router, prefix="/api/dashboard")
-app.include_router(auth_router.router, prefix="/api/dashboard")
-app.include_router(application_router.router, prefix="/api/dashboard")
-app.include_router(api_key_router.router, prefix="/api/dashboard")
-app.include_router(usage_stats_router.router, prefix="/api/dashboard")
-app.include_router(captcha_router.router, prefix="/api")
-app.include_router(payment_router.router, prefix="/api")
+app.include_router(users_router.router,
+                   prefix="/api/dashboard")        # 유저관리 라우터
+app.include_router(auth_router.router,
+                   prefix="/api/dashboard")         # 로그인(인증) 라우터
+app.include_router(application_router.router,
+                   prefix="/api/dashboard")  # 애플리케이션 라우터
+app.include_router(api_key_router.router,
+                   prefix="/api/dashboard")      # API 키 라우터
+app.include_router(usage_stats_router.router,
+                   prefix="/api/dashboard")  # 사용량 라우터
+app.include_router(captcha_router.router,
+                   prefix="/api")                # 캡챠 라우터
+app.include_router(payment_router.router,
+                   prefix="/api")                # 결제 라우터
+app.include_router(contact_router.router,
+                   prefix="/api")                # 문의 라우터
 
 # 메트릭 엔드포인트를 추가합니다.
 app.add_route("/metrics", metrics)
