@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, HTTPException
 import logging.config
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +10,7 @@ from starlette_prometheus import PrometheusMiddleware, metrics
 
 
 from db.session import engine
-from app.routers import payment_router, users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router
+from app.routers import payment_router, users_router, auth_router, application_router, api_key_router, captcha_router, usage_stats_router, contact_router
 from app.admin.admin import setup_admin
 from app.admin.auth import AdminAuth
 from app.core.config import settings
@@ -63,6 +63,27 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": message},
     )
 
+
+# 로거 설정
+logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    HTTPException이 발생했을 때, 오류 내용을 로깅하기 위한 커스텀 핸들러입니다.
+    """
+    logger.error(
+        f"HTTP 예외 발생: {request.method} {request.url.path} {exc.status_code} {exc.detail}"
+    )
+    # 기본 HTTPException 동작과 동일하게 JSON 응답을 반환합니다.
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
+
+
 # CORS 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
@@ -95,13 +116,22 @@ def read_root():
 
 
 # 라우터 등록
-app.include_router(users_router.router, prefix="/api/dashboard")
-app.include_router(auth_router.router, prefix="/api/dashboard")
-app.include_router(application_router.router, prefix="/api/dashboard")
-app.include_router(api_key_router.router, prefix="/api/dashboard")
-app.include_router(usage_stats_router.router, prefix="/api/dashboard")
-app.include_router(captcha_router.router, prefix="/api")
-app.include_router(payment_router.router, prefix="/api")
+app.include_router(users_router.router,
+                   prefix="/api/dashboard")        # 유저관리 라우터
+app.include_router(auth_router.router,
+                   prefix="/api/dashboard")         # 로그인(인증) 라우터
+app.include_router(application_router.router,
+                   prefix="/api/dashboard")  # 애플리케이션 라우터
+app.include_router(api_key_router.router,
+                   prefix="/api/dashboard")      # API 키 라우터
+app.include_router(usage_stats_router.router,
+                   prefix="/api/dashboard")  # 사용량 라우터
+app.include_router(captcha_router.router,
+                   prefix="/api")                # 캡챠 라우터
+app.include_router(payment_router.router,
+                   prefix="/api")                # 결제 라우터
+app.include_router(contact_router.router,
+                   prefix="/api")                # 문의 라우터
 
 # 메트릭 엔드포인트를 추가합니다.
 app.add_route("/metrics", metrics)

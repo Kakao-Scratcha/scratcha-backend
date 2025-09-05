@@ -32,29 +32,31 @@ async def cleanup_expired_captcha_sessions():
             CaptchaSession.createdAt < timeout_threshold,
             ~CaptchaSession.captchaLog.any()  # CaptchaLog가 없는 세션 필터링
         ).all()
-        logger.info(f"{len(expired_sessions)} 개의 만료된 세션 발견")
 
-        for session in expired_sessions:
-            # Ensure session.createdAt is timezone-aware
-            if session.createdAt.tzinfo is None:
-                session.createdAt = settings.TIMEZONE.localize(
-                    session.createdAt)
+        if expired_sessions:
+            logger.info(f"{len(expired_sessions)} 개의 만료된 세션 발견")
 
-            # TIMEOUT 로그 생성
-            latency = datetime.now(settings.TIMEZONE) - session.createdAt
-            captcha_repo.createCaptchaLog(
-                session=session,
-                result=CaptchaResult.TIMEOUT,
-                latency_ms=int(latency.total_seconds() * 1000)
-            )
-            # 사용량 통계 업데이트
-            usage_stats_repo.incrementVerificationResult(
-                session.keyId, CaptchaResult.TIMEOUT.value, int(
-                    latency.total_seconds() * 1000)
-            )
-            logger.info(
-                f"세션 만료(TIMEOUT) : [세션 ID={session.id}, 클라이언트 토큰={session.clientToken}]")
-        db.commit()
+            for session in expired_sessions:
+                # Ensure session.createdAt is timezone-aware
+                if session.createdAt.tzinfo is None:
+                    session.createdAt = settings.TIMEZONE.localize(
+                        session.createdAt)
+
+                # TIMEOUT 로그 생성
+                latency = datetime.now(settings.TIMEZONE) - session.createdAt
+                captcha_repo.createCaptchaLog(
+                    session=session,
+                    result=CaptchaResult.TIMEOUT,
+                    latency_ms=int(latency.total_seconds() * 1000)
+                )
+                # 사용량 통계 업데이트
+                usage_stats_repo.incrementVerificationResult(
+                    session.keyId, CaptchaResult.TIMEOUT.value, int(
+                        latency.total_seconds() * 1000)
+                )
+                logger.info(
+                    f"세션 만료(TIMEOUT) : [세션 ID={session.id}, 클라이언트 토큰={session.clientToken}]")
+            db.commit()
     except Exception as e:
         db.rollback()
         logger.error(f"캡챠 세션 타임아웃 에러: {e}")
