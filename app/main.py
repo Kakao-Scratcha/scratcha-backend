@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
+from starlette_prometheus import PrometheusMiddleware, metrics
 
 
 from db.session import engine
@@ -77,13 +78,15 @@ app.add_middleware(
 app.add_middleware(SessionMiddleware,
                    secret_key=settings.SESSION_SECRET_KEY)  # 하드코딩된 시크릿 키
 
+# Prometheus 미들웨어를 추가합니다.
+app.add_middleware(PrometheusMiddleware)
+
 # SQLAdmin 관리자 인터페이스를 설정합니다.
 # setup_admin 함수를 통해 모든 ModelView가 등록됩니다.
 authentication_backend = AdminAuth(
-    secret_key=settings.SESSION_SECRET_KEY)  # 하드코딩된 시크릿 키
+    secret_key=settings.SESSION_SECRET_KEY)
 admin = setup_admin(app, engine)
 admin.authentication_backend = authentication_backend
-# admin.base_url = "/admin"
 
 
 @app.get("/")
@@ -98,8 +101,7 @@ app.include_router(application_router.router, prefix="/api/dashboard")
 app.include_router(api_key_router.router, prefix="/api/dashboard")
 app.include_router(usage_stats_router.router, prefix="/api/dashboard")
 app.include_router(captcha_router.router, prefix="/api")
-app.include_router(payment_router.router, prefix="/api")  # payment_router 추가
+app.include_router(payment_router.router, prefix="/api")
 
-# 정적 파일 서빙 설정
-# app.mount("/api/payments", StaticFiles(directory="pg/public"),
-#           name="payments_static")
+# 메트릭 엔드포인트를 추가합니다.
+app.add_route("/metrics", metrics)
