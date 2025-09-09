@@ -28,10 +28,11 @@ async def cleanup_expired_captcha_sessions():
             settings.TIMEZONE) - timedelta(minutes=3)
 
         # CaptchaLog가 없는 세션만 필터링
+        # 2025-09-08 DEBUG_001: TIMEOUT 로그 중복 문제를 해결하기 위해 만료된 세션을 조회할 때 with_for_update()를 사용하여 비관적 잠금을 설정합니다.
         expired_sessions = db.query(CaptchaSession).filter(
             CaptchaSession.createdAt < timeout_threshold,
             ~CaptchaSession.captchaLog.any()  # CaptchaLog가 없는 세션 필터링
-        ).all()
+        ).with_for_update().all()
 
         if expired_sessions:
             logger.info(f"{len(expired_sessions)} 개의 만료된 세션 발견")

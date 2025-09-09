@@ -19,8 +19,8 @@ class Payment(Base):
     userId = Column(
         "user_id",
         Integer,
-        ForeignKey("user.id"),
-        nullable=False,
+        ForeignKey("user.id", ondelete="SET NULL"),
+        nullable=True,
         comment="결제를 요청한 사용자 ID (FK)"
     )
     paymentKey = Column(

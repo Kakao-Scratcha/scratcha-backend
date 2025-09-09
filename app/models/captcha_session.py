@@ -21,8 +21,8 @@ class CaptchaSession(Base):
     keyId = Column(
         "api_key_id",
         Integer,
-        ForeignKey("api_key.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("api_key.id", ondelete="SET NULL"),
+        nullable=True,
         comment="사용된 API 키"
     )
 

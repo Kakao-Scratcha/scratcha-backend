@@ -22,8 +22,8 @@ class UsageStats(Base):
     keyId = Column(
         "api_key_id",
         Integer,
-        ForeignKey("api_key.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("api_key.id", ondelete="SET NULL"),
+        nullable=True,
         comment="통계의 기준이되는 API 키"
     )
     date = Column(

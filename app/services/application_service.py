@@ -59,7 +59,7 @@ class ApplicationService:
 
     def createApplication(self, currentUser: User, appCreate: ApplicationCreate) -> ApplicationResponse:
         """
-        새로운 애플리케이션을 생성하고, 해당 애플리케이션에 대한 API 키를 발급합니다.
+        새로운 애플리케케이션을 생성하고, 해당 애플리케이션에 대한 API 키를 발급합니다.
 
         Args:
             currentUser (User): 현재 인증된 사용자 객체.
@@ -86,20 +86,29 @@ class ApplicationService:
             # 4. ApplicationRepository를 통해 새로운 애플리케이션을 생성합니다.
             app = self.appRepo.createApplication(currentUser.id, appCreate)
 
-            # 6. ApiKeyRepository를 통해 생성된 애플리케이션에 대한 API 키를 발급합니다.
+            # 5. ApiKeyRepository를 통해 생성된 애플리케이션에 대한 API 키를 발급합니다.
             key = self.apiKeyRepo.createKey(
                 userId=currentUser.id,
                 appId=app.id,
                 expiresPolicy=appCreate.expiresPolicy
             )
 
-            # 7. 생성된 애플리케이션과 API 키 정보를 매핑하여 반환합니다.
+            # 6. 모든 DB 작업이 성공하면 변경사항을 커밋합니다.
+            self.db.commit()
+
+            # 7. 커밋된 객체들의 최신 상태를 DB로부터 받아옵니다.
+            self.db.refresh(app)
+            self.db.refresh(key)
+
+            # 8. 생성된 애플리케이션과 API 키 정보를 매핑하여 반환합니다.
             return self.mapToApplicationResponse(app, key)
         except HTTPException as e:
-            # 8. HTTP 예외는 그대로 다시 발생시킵니다.
+            # 9. HTTP 예외 발생 시 롤백하고 예외를 다시 발생시킵니다.
+            self.db.rollback()
             raise e
         except Exception as e:
-            # 9. 그 외 예외 발생 시 서버 오류를 반환합니다。
+            # 10. 그 외 모든 예외 발생 시 롤백하고 서버 오류를 발생시킵니다.
+            self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"애플리케이션 생성 중 오류가 발생했습니다: {e}"
@@ -221,13 +230,21 @@ class ApplicationService:
             # 4. ApplicationRepository를 통해 애플리케이션 정보를 업데이트합니다.
             updatedApp = self.appRepo.updateApplication(app, appUpdate)
 
-            # 5. 업데이트된 애플리케이션과 API 키 정보를 매핑하여 반환합니다.
+            # 5. 변경사항을 커밋합니다.
+            self.db.commit()
+
+            # 6. 최신 상태를 반영합니다.
+            self.db.refresh(updatedApp)
+
+            # 7. 업데이트된 애플리케이션과 API 키 정보를 매핑하여 반환합니다.
             return self.mapToApplicationResponse(updatedApp, key)
         except HTTPException as e:
-            # 6. HTTP 예외는 그대로 다시 발생시킵니다.
+            # 8. HTTP 예외 발생 시 롤백하고 예외를 다시 발생시킵니다.
+            self.db.rollback()
             raise e
         except Exception as e:
-            # 7. 그 외 예외 발생 시 서버 오류를 반환합니다.
+            # 9. 그 외 모든 예외 발생 시 롤백하고 서버 오류를 발생시킵니다.
+            self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"애플리케이션 업데이트 중 오류가 발생했습니다: {e}"
@@ -265,13 +282,23 @@ class ApplicationService:
             # 5. ApplicationRepository를 통해 애플리케이션을 소프트 삭제합니다。
             deletedApp = self.appRepo.deleteApplication(appId)
 
-            # 6. 삭제 처리된 애플리케이션과 API 키 정보를 매핑하여 반환합니다.
+            # 6. 변경사항을 커밋합니다.
+            self.db.commit()
+
+            # 7. 최신 상태를 반영합니다.
+            self.db.refresh(deletedApp)
+            if deletedKey:
+                self.db.refresh(deletedKey)
+
+            # 8. 삭제 처리된 애플리케이션과 API 키 정보를 매핑하여 반환합니다.
             return self.mapToApplicationResponse(deletedApp, deletedKey)
         except HTTPException as e:
-            # 7. HTTP 예외는 그대로 다시 발생시킵니다.
+            # 9. HTTP 예외 발생 시 롤백하고 예외를 다시 발생시킵니다.
+            self.db.rollback()
             raise e
         except Exception as e:
-            # 8. 그 외 예외 발생 시 서버 오류를 반환합니다.
+            # 10. 그 외 모든 예외 발생 시 롤백하고 서버 오류를 발생시킵니다.
+            self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"애플리케이션 삭제 중 오류가 발생했습니다: {e}"
