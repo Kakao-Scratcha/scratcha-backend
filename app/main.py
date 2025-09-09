@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
-from starlette_prometheus import PrometheusMiddleware, metrics
+from prometheus_fastapi_instrumentator import Instrumentator
 
 
 from db.session import engine
@@ -34,6 +34,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan  # Add lifespan to FastAPI app
 )
+
+# Prometheus 메트릭을 설정합니다.
+Instrumentator().instrument(app).expose(app)
 
 
 @app.exception_handler(RequestValidationError)
@@ -99,9 +102,6 @@ app.add_middleware(
 app.add_middleware(SessionMiddleware,
                    secret_key=settings.SESSION_SECRET_KEY)  # 하드코딩된 시크릿 키
 
-# Prometheus 미들웨어를 추가합니다.
-app.add_middleware(PrometheusMiddleware)
-
 # SQLAdmin 관리자 인터페이스를 설정합니다.
 # setup_admin 함수를 통해 모든 ModelView가 등록됩니다.
 authentication_backend = AdminAuth(
@@ -132,6 +132,3 @@ app.include_router(payment_router.router,
                    prefix="/api")                # 결제 라우터
 app.include_router(contact_router.router,
                    prefix="/api")                # 문의 라우터
-
-# 메트릭 엔드포인트를 추가합니다.
-app.add_route("/metrics", metrics)
