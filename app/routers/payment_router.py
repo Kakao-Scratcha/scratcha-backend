@@ -245,12 +245,11 @@ def confirmPayment(
     current_user: User = Depends(getCurrentUser),
     payment_repo: PaymentRepository = Depends(get_payment_repo),
 ):
-    # 1. 토스페이먼츠 API 인증을 위한 시크릿 키를 준비합니다.
-    #    - 시크릿 키 뒤에 콜론을 붙여 Base64로 인코딩하는 Basic 인증 방식을 사용합니다.
+    # 토스페이먼츠 API 인증을 위한 시크릿 키를 준비합니다.
     encrypted_secret_key = "Basic " + \
         base64.b64encode((SECRET_KEY + ":").encode("utf-8")).decode("utf-8")
 
-    # 2. 토스페이먼츠 결제 승인 API에 보낼 헤더와 페이로드를 구성합니다.
+    # 토스페이먼츠 결제 승인 API에 보낼 헤더와 페이로드를 구성합니다.
     headers = {
         "Authorization": encrypted_secret_key,
         "Content-Type": "application/json",
@@ -262,7 +261,7 @@ def confirmPayment(
     }
 
     try:
-        # 3. 토스페이먼츠에 결제 승인을 요청합니다.
+        # 1. 토스페이먼츠에 결제 승인을 요청합니다.
         response = requests.post(
             "https://api.tosspayments.com/v1/payments/confirm",
             headers=headers,
@@ -270,10 +269,9 @@ def confirmPayment(
         )
         response.raise_for_status()  # 응답 코드가 2xx가 아니면 예외를 발생시킵니다.
 
-        # 4. API 호출 성공 시, 응답받은 JSON 데이터를 변수에 저장합니다.
         payment_data = response.json()
 
-        # orderName에서 토큰 수 추출
+        # 2. API 호출 성공 후, 응답 데이터 유효성을 검증합니다.
         order_name = payment_data.get("orderName")
         match = re.search(r'(\d+)\s*토큰', order_name)
         if not match:
@@ -281,64 +279,63 @@ def confirmPayment(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="주문명에서 토큰 수를 추출할 수 없습니다. 'X 토큰 구매' 형식이어야 합니다."
             )
+        token_amount = int(match.group(1))
 
-        try:
-            token_amount = int(match.group(1))
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="유효하지 않은 토큰 수 형식입니다."
-            )
-
-        # 결제 금액 유효성 검사
         total_amount = payment_data.get("totalAmount")
         expected_amount = settings.ALLOWED_PAYMENT_PLANS.get(token_amount)
-        if expected_amount is None:
+        if expected_amount is None or total_amount > expected_amount:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{token_amount} 토큰에 대한 유효한 결제 정책이 없습니다."
+                detail=f"결제 금액({total_amount}원)이 정책과 맞지 않습니다."
             )
 
-        # 결제 금액 유효성 검사 (할인/쿠폰 적용 고려)
-        # 실제 결제 금액(total_amount)은 정책 금액(expected_amount)보다 작거나 같아야 합니다.
-        if total_amount > expected_amount:
+        # 3. 데이터베이스 작업을 단일 트랜잭션으로 처리합니다.
+        try:
+            # 3-1. 결제 정보 생성 (세션에 추가, 커밋 X)
+            payment_to_create = PaymentCreate(
+                userId=current_user.id,
+                orderId=payment_data.get("orderId"),
+                paymentKey=payment_data.get("paymentKey"),
+                status=payment_data.get("status"),
+                method=payment_data.get("method"),
+                orderName=payment_data.get("orderName"),
+                amount=payment_data.get("totalAmount"),
+                currency=payment_data.get("currency"),
+                approvedAt=payment_data.get("approvedAt"),
+            )
+            db_payment = payment_repo.create_payment(
+                payment_in=payment_to_create)
+
+            # 3-2. 사용자 토큰 업데이트 (세션에 추가)
+            current_user.token += token_amount
+            payment_repo.db.add(current_user)
+
+            # 3-3. 모든 변경사항을 한 번에 커밋
+            payment_repo.db.commit()
+
+            # 3-4. 커밋된 객체들을 리프레시
+            payment_repo.db.refresh(current_user)
+            payment_repo.db.refresh(db_payment)
+
+        except Exception as db_error:
+            # 3-5. DB 작업 중 오류 발생 시 롤백 처리
+            payment_repo.db.rollback()
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"결제 금액이 정책 금액({expected_amount}원)보다 많습니다. {token_amount} 토큰에는 {expected_amount}원 이하로 결제되어야 합니다."
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"데이터베이스 처리 중 오류가 발생했습니다: {db_error}"
             )
-        # Note: We are not checking for a minimum amount here, assuming any discount is valid.
-        # If a minimum payment is required, additional logic would be needed.
 
-        # 5. 우리 데이터베이스에 저장할 결제 정보 스키마를 생성합니다.
-        payment_to_create = PaymentCreate(
-            userId=current_user.id,  # JWT 토큰에서 얻은 사용자 ID
-            orderId=payment_data.get("orderId"),
-            paymentKey=payment_data.get("paymentKey"),
-            status=payment_data.get("status"),
-            method=payment_data.get("method"),
-            orderName=payment_data.get("orderName"),
-            amount=payment_data.get("totalAmount"),
-            currency=payment_data.get("currency"),
-            approvedAt=payment_data.get("approvedAt"),
-        )
-
-        # 6. 리포지토리를 통해 데이터베이스에 결제 정보를 기록합니다.
-        payment_repo.create_payment(payment_in=payment_to_create)
-
-        # 7. 사용자 토큰 업데이트
-        current_user.token += token_amount
-        payment_repo.db.add(current_user)
-        payment_repo.db.commit()
-        payment_repo.db.refresh(current_user)
-
-        # 8. 성공적으로 처리된 경우, 토스페이먼츠의 응답을 그대로 클라이언트에 반환합니다.
+        # 4. 성공적으로 처리된 경우, 토스페이먼츠의 응답을 그대로 클라이언트에 반환합니다.
         return JSONResponse(content=payment_data, status_code=response.status_code)
 
     except requests.exceptions.HTTPError as e:
-        # 8. 토스페이먼츠 API로부터 HTTP 에러를 받은 경우, 해당 내용을 그대로 클라이언트에 반환합니다.
+        # 토스페이먼츠 API로부터 HTTP 에러를 받은 경우, 해당 내용을 그대로 클라이언트에 반환합니다.
         return JSONResponse(content=e.response.json(), status_code=e.response.status_code)
+    except HTTPException as e:
+        # 유효성 검사 등에서 발생한 HTTP 예외는 그대로 전달합니다.
+        raise e
     except Exception as e:
-        # 9. 그 외의 예외가 발생한 경우, 상세 트레이스백을 출력하고 500 에러를 반환합니다.
+        # 그 외의 예외가 발생한 경우, 500 에러를 반환합니다.
         import traceback
         traceback.print_exc()
         raise HTTPException(

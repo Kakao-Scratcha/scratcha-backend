@@ -15,7 +15,7 @@ DATABASE_URL = settings.DATABASE_URL
 
 # SQLAlchemy 엔진 생성
 # pool_pre_ping=True는 연결이 유효한지 확인하여 끊어진 연결 문제 방지에 도움을 줍니다.
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=20, max_overflow=40, pool_recycle=1800)
 
 # 세션 로컬 클래스 생성
 # 이 클래스의 인스턴스가 실제 데이터베이스 세션이 됩니다.

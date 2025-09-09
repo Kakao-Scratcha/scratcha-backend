@@ -70,9 +70,17 @@ class UserService:
             # 4. UserRepository를 통해 새로운 사용자를 생성합니다.
             newUser = self.userRepo.createUser(userData, hashedPassword)
 
-            # 5. 생성된 사용자 객체를 반환합니다.
+            # 5. 변경사항을 커밋합니다.
+            self.userRepo.db.commit()
+
+            # 6. 최신 상태를 반영합니다.
+            self.userRepo.db.refresh(newUser)
+
+            # 7. 생성된 사용자 객체를 반환합니다.
             return newUser
         except Exception as e:
+            # 8. 예외 발생 시 롤백하고 서버 오류를 발생시킵니다.
+            self.userRepo.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"사용자 생성 중 오류가 발생했습니다: {e}"
@@ -144,11 +152,19 @@ class UserService:
             # 5. UserRepository를 통해 사용자 정보를 업데이트합니다.
             updatedUser = self.userRepo.updateUser(user, userUpdate)
 
-            # 6. 업데이트된 사용자 객체를 반환합니다.
+            # 6. 변경사항을 커밋합니다.
+            self.userRepo.db.commit()
+
+            # 7. 최신 상태를 반영합니다.
+            self.userRepo.db.refresh(updatedUser)
+
+            # 8. 업데이트된 사용자 객체를 반환합니다.
             return updatedUser
         except HTTPException as e:
+            self.userRepo.db.rollback()
             raise e
         except Exception as e:
+            self.userRepo.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"사용자 업데이트 중 오류가 발생했습니다: {e}"
@@ -212,9 +228,16 @@ class UserService:
             # 3. UserRepository를 통해 사용자를 소프트 삭제합니다.
             deletedUser = self.userRepo.deleteUser(user)
 
-            # 4. 삭제된 사용자 객체를 반환합니다.
+            # 4. 변경사항을 커밋합니다.
+            self.userRepo.db.commit()
+
+            # 5. 최신 상태를 반영합니다.
+            self.userRepo.db.refresh(deletedUser)
+
+            # 6. 삭제된 사용자 객체를 반환합니다.
             return deletedUser
         except Exception as e:
+            self.userRepo.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"사용자 삭제 중 오류가 발생했습니다: {e}"

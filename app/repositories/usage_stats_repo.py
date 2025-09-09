@@ -11,27 +11,13 @@ from app.models.captcha_log import CaptchaLog
 
 
 class UsageStatsRepository:
-    """
-    사용량 통계 관련 데이터베이스 작업을 처리하는 리포지토리입니다.
-    이 클래스는 통계 데이터 조회, 생성, 업데이트 등 DB와 직접 상호작용하는 모든 로직을 포함합니다.
-    """
-
     def __init__(self, db: Session):
-        """
-        UsageStatsRepository의 생성자입니다.
-
-        Args:
-            db (Session): SQLAlchemy 데이터베이스 세션. 의존성 주입을 통해 제공됩니다.
-        """
         self.db = db
 
     def incrementTotalRequests(self, keyId: int):
         """
         특정 API 키에 대한 오늘 날짜의 캡챠 총 요청 수를 1 증가시킵니다.
         오늘 날짜의 통계 데이터가 없으면 새로 생성하고, 있으면 카운트를 업데이트합니다.
-
-        Args:
-            keyId (int): 대상 API 키의 고유 ID.
         """
         try:
             # 1. 오늘 날짜를 기준으로 해당 API 키의 통계 데이터를 조회합니다.
@@ -69,11 +55,6 @@ class UsageStatsRepository:
         """
         특정 API 키에 대한 오늘 날짜의 캡챠 검증 결과를(성공/실패/타임아웃) 1 증가시키고,
         평균 응답 시간 계산을 위한 총 지연 시간과 검증 횟수를 업데이트합니다.
-
-        Args:
-            keyId (int): 대상 API 키의 고유 ID.
-            result (str): 캡챠 검증 결과. ("success", "fail", "timeout")
-            latencyMs (int): 해당 검증의 지연 시간 (밀리초).
         """
         try:
             # 1. 오늘 날짜의 통계 데이터를 조회합니다.
@@ -106,10 +87,16 @@ class UsageStatsRepository:
                 usageStats.captchaTimeoutCount += 1
 
             # 4. 평균 응답시간 계산을 위해 총 지연시간과 검증 횟수를 업데이트합니다.
+            #    TIMEOUT 결과는 검증 횟수에 포함하지 않습니다.
             usageStats.totalLatencyMs += latencyMs
-            usageStats.verificationCount += 1
-            usageStats.avgResponseTimeMs = usageStats.totalLatencyMs / \
-                usageStats.verificationCount
+            if result != "timeout": # TIMEOUT 결과는 지연 시간에 포함하지 않습니다.
+                usageStats.verificationCount += 1
+            
+            if usageStats.verificationCount > 0:
+                usageStats.avgResponseTimeMs = usageStats.totalLatencyMs / \
+                    usageStats.verificationCount
+            else:
+                usageStats.avgResponseTimeMs = 0 # 검증 횟수가 0이면 평균 응답 시간도 0
 
             # 5. 변경사항을 데이터베이스 세션에 반영합니다.
             self.db.flush([usageStats])
@@ -153,7 +140,7 @@ class UsageStatsRepository:
             # 2. 제공된 API 키 ID 목록이 없으면 빈 결과를 반환합니다.
             if not keyIds:
                 return [], 0
-            
+
             # 3. API 키 ID 목록으로 쿼리를 필터링합니다.
             base_query = base_query.filter(ApiKey.id.in_(keyIds))
 
@@ -169,7 +156,8 @@ class UsageStatsRepository:
             # 5. 필터링된 전체 로그의 개수를 계산합니다.
             total_count = base_query.count()
             # 6. 페이지네이션(skip, limit)과 정렬을 적용하여 실제 로그 데이터를 조회합니다.
-            logs = base_query.order_by(CaptchaLog.created_at.desc()).offset(skip).limit(limit).all()
+            logs = base_query.order_by(CaptchaLog.created_at.desc()).offset(
+                skip).limit(limit).all()
 
             # 7. 조회된 로그 리스트와 전체 개수를 튜플로 반환합니다.
             return logs, total_count
@@ -200,17 +188,21 @@ class UsageStatsRepository:
 
             # 2. 통계 집계를 위한 기본 쿼리를 작성합니다.
             query = self.db.query(
-                timePeriod, # 그룹화된 시간
-                func.coalesce(func.count(CaptchaLog.id), 0).label('totalRequests'), # 총 요청 수
-                func.coalesce(func.sum(case((CaptchaLog.result == 'success', 1), else_=0)), 0).label('successCount'), # 성공 수
-                func.coalesce(func.sum(case((CaptchaLog.result == 'fail', 1), else_=0)), 0).label('failCount'), # 실패 수
-                func.coalesce(func.sum(case((CaptchaLog.result == 'timeout', 1), else_=0)), 0).label('timeoutCount') # 타임아웃 수
+                timePeriod,  # 그룹화된 시간
+                func.coalesce(func.count(CaptchaLog.id), 0).label(
+                    'totalRequests'),  # 총 요청 수
+                func.coalesce(func.sum(case((CaptchaLog.result == 'success', 1), else_=0)), 0).label(
+                    'successCount'),  # 성공 수
+                func.coalesce(func.sum(case((CaptchaLog.result == 'fail', 1), else_=0)), 0).label(
+                    'failCount'),  # 실패 수
+                func.coalesce(func.sum(case((CaptchaLog.result == 'timeout', 1), else_=0)), 0).label(
+                    'timeoutCount')  # 타임아웃 수
             ).filter(CaptchaLog.created_at.between(f'{startDate} 00:00:00', f'{endDate} 23:59:59'))
 
             # 3. 제공된 API 키 ID 목록이 없으면 빈 결과를 반환합니다.
             if not keyIds:
                 return []
-            
+
             # 4. API 키 ID 목록으로 쿼리를 필터링합니다.
             query = query.filter(CaptchaLog.keyId.in_(keyIds))
 
@@ -253,11 +245,11 @@ class UsageStatsRepository:
             query = self.db.query(
                 groupPeriod,  # 그룹화된 기간
                 func.coalesce(func.sum(UsageStats.captchaTotalRequests),
-                             0).label('totalRequests'),
+                              0).label('totalRequests'),
                 func.coalesce(func.sum(UsageStats.captchaSuccessCount),
-                             0).label('successCount'),
+                              0).label('successCount'),
                 func.coalesce(func.sum(UsageStats.captchaFailCount),
-                             0).label('failCount'),
+                              0).label('failCount'),
                 func.coalesce(func.sum(UsageStats.captchaTimeoutCount), 0).label(
                     'timeoutCount')
             ).filter(UsageStats.date.between(startDate, endDate))
