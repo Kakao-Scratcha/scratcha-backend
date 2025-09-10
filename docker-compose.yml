@@ -11,7 +11,9 @@ services:
         environment:
             - TZ=Asia/Seoul
         volumes:
-            - ./app:/app/app # 애플리케이션 코드 디렉토리만 마운트
+            - ./app:/app/app
+            - ./alembic:/app/alembic
+            - ./alembic.ini:/app/alembic.ini
         depends_on:
             db:
                 condition: service_healthy
