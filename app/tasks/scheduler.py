@@ -32,7 +32,7 @@ async def cleanup_expired_captcha_sessions():
         expired_sessions = db.query(CaptchaSession).filter(
             CaptchaSession.createdAt < timeout_threshold,
             ~CaptchaSession.captchaLog.any()  # CaptchaLog가 없는 세션 필터링
-        ).with_for_update().all()
+        ).with_for_update(skip_locked=True).all()
 
         if expired_sessions:
             logger.info(f"{len(expired_sessions)} 개의 만료된 세션 발견")
