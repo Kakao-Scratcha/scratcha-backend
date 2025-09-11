@@ -49,3 +49,10 @@ class CaptchaVerificationResponse(BaseModel):
         description="검증 결과에 대한 메시지",
         example="캡챠 검증에 성공했습니다."
     )
+
+class CaptchaTaskResponse(BaseModel):
+    taskId: str = Field(
+        ...,
+        description="비동기 캡챠 검증 작업의 고유 ID",
+        example="d91206cf-3392-4c36-901a-83feb9d10cde"
+    )

@@ -14,19 +14,16 @@ from app.routers import payment_router, users_router, auth_router, application_r
 from app.admin.admin import setup_admin
 from app.admin.auth import AdminAuth
 from app.core.config import settings
-from app.tasks.scheduler import start_scheduler, shutdown_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup event
-    print("이벤트 스케줄러 시작...")
+    print("로깅 설정 적용...")
     logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
-    start_scheduler()
     yield
     # Shutdown event
-    print("이벤트 스케줄러 종료...")
-    shutdown_scheduler()
+    print("애플리케이션 종료.")
 
 app = FastAPI(
     title="Dashboard API",

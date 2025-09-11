@@ -16,3 +16,5 @@ apscheduler==3.10.4
 pytz==2024.1
 requests
 prometheus-fastapi-instrumentator
+celery==5.4.0
+flower==2.0.1

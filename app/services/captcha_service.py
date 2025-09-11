@@ -1,4 +1,4 @@
-# backend/services/captcha_service.py
+# app/services/captcha_service.py
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -27,6 +27,35 @@ class CaptchaService:
         """
         self.db = db
         self.captchaRepo = CaptchaRepository(db)
+
+    def verifyCaptchaAnswerAsync(self, clientToken: str, request: CaptchaVerificationRequest, ipAddress: Optional[str], userAgent: Optional[str]) -> str:
+        """
+        캡챠 답변 검증을 비동기 작업으로 전달합니다.
+
+        Celery 작업을 생성하고, 즉시 작업 ID를 반환하여 클라이언트가 오래 기다리지 않도록 합니다.
+        실제 검증 로직은 백그라운드의 Celery 워커에서 실행됩니다.
+
+        Args:
+            clientToken (str): 검증할 캡챠 세션의 고유 클라이언트 토큰입니다.
+            request (CaptchaVerificationRequest): 사용자가 제출한 답변을 담은 요청 모델입니다.
+            ipAddress (Optional[str]): 사용자 요청의 IP 주소입니다.
+            userAgent (Optional[str]): 사용자 요청의 User-Agent 문자열입니다.
+
+        Returns:
+            str: 생성된 Celery 작업의 고유 ID.
+        """
+        # 순환 참조를 방지하기 위해 함수 내에서 task를 임포트합니다.
+        from app.tasks.captcha_tasks import verifyCaptchaTask
+        
+        # .delay()를 사용하여 작업을 메시지 큐에 전달합니다.
+        # 인자들은 Celery에 의해 직렬화되어 워커 프로세스로 전달됩니다.
+        task = verifyCaptchaTask.delay(
+            clientToken=clientToken,
+            answer=request.answer,
+            ipAddress=ipAddress,
+            userAgent=userAgent
+        )
+        return task.id
 
     def generateCaptchaProblem(self, apiKey: ApiKey, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaProblemResponse:
         """
@@ -57,24 +86,19 @@ class CaptchaService:
             user.token -= 1
             self.db.add(user)
 
-            # 4. 기존에 로그되지 않은 세션이 있다면 삭제합니다. (1:1 트랜잭션 유지),
-            # ❗️DEBUG_002: 여러 유저가 하나의 API키로 문제를 생성할떄 마지막으로 호출한 유저만이 문제를 풀 수 있고 나머지 유저는 404 에러가 발생함
-            #          -> 해당 API 키와 문제 캡챠 문제 수를 1:N 트랜잭션으로 변경
-            # self.captchaRepo.deleteUnloggedSessionsByApiKey(apiKey.id)
-
-            # 5. CaptchaRepository를 통해 활성화된 캡챠 문제 중 하나를 무작위로 선택합니다.
+            # 4. CaptchaRepository를 통해 활성화된 캡챠 문제 중 하나를 무작위로 선택합니다.
             selectedProblem = self.captchaRepo.getRandomActiveProblem(
                 apiKey.difficulty)
-            # 6. 유효한 캡챠 문제가 없는 경우 503 Service Unavailable 오류를 발생시킵니다.
+            # 5. 유효한 캡챠 문제가 없는 경우 503 Service Unavailable 오류를 발생시킵니다.
             if not selectedProblem:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="활성화된 캡차 문제가 없습니다."
                 )
 
-            # 7. 고유한 클라이언트 토큰을 생성합니다.
+            # 6. 고유한 클라이언트 토큰을 생성합니다.
             clientToken = str(uuid.uuid4())
-            # 8. CaptchaRepository를 통해 새로운 캡챠 세션을 생성하고 세션에 추가합니다. (아직 커밋되지 않음)
+            # 7. CaptchaRepository를 통해 새로운 캡챠 세션을 생성하고 세션에 추가합니다. (아직 커밋되지 않음)
             session = self.captchaRepo.createCaptchaSession(
                 keyId=apiKey.id,
                 captchaProblemId=selectedProblem.id,
@@ -83,7 +107,7 @@ class CaptchaService:
                 userAgent=userAgent
             )
 
-            # 9. S3_BASE_URL 환경 변수를 가져와 전체 이미지 URL을 구성합니다.
+            # 8. S3_BASE_URL 환경 변수를 가져와 전체 이미지 URL을 구성합니다.
             s3BaseUrl = settings.S3_BASE_URL
             if not s3BaseUrl:
                 raise HTTPException(
@@ -94,17 +118,17 @@ class CaptchaService:
             # S3 이미지 키와 S3_BASE_URL을 조합하여 클라이언트가 직접 접근할 수 있는 전체 URL을 생성합니다.
             fullImageUrl = f"{s3BaseUrl}/{selectedProblem.imageUrl}"
 
-            # 10. usage_stats_repo를 사용하여 요청 카운트를 업데이트합니다.
+            # 9. usage_stats_repo를 사용하여 요청 카운트를 업데이트합니다.
             usageStatsRepo = UsageStatsRepository(self.db)
             usageStatsRepo.incrementTotalRequests(apiKey.id)
 
-            # 11. 사용자 토큰 차감 및 캡챠 세션 생성 등 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
+            # 10. 사용자 토큰 차감 및 캡챠 세션 생성 등 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
             self.db.commit()
 
-            # 12. 커밋된 세션 객체를 새로고침하여 최신 상태를 반영합니다.
+            # 11. 커밋된 세션 객체를 새로고침하여 최신 상태를 반영합니다.
             self.db.refresh(session)
 
-            # 13. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
+            # 12. 클라이언트에게 반환할 CaptchaProblemResponse 객체를 생성하여 반환합니다.
             option_list = [
                 selectedProblem.answer,
                 selectedProblem.wrongAnswer1,
@@ -120,11 +144,11 @@ class CaptchaService:
                 options=option_list
             )
         except HTTPException as e:
-            # 12. HTTP 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 해당 예외를 다시 발생시킵니다.
+            # 13. HTTP 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 해당 예외를 다시 발생시킵니다.
             self.db.rollback()
             raise e
         except Exception as e:
-            # 13. 그 외 예상치 못한 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 500 Internal Server Error를 발생시킵니다.
+            # 14. 그 외 예상치 못한 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 500 Internal Server Error를 발생시킵니다.
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -132,6 +156,7 @@ class CaptchaService:
     def verifyCaptchaAnswer(self, clientToken: str, request: CaptchaVerificationRequest, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaVerificationResponse:
         """
         제출된 캡챠 답변을 검증하고, 결과를 기록하는 비즈니스 로직입니다.
+        이 함수는 동기적으로 실행되며, 비동기 작업인 `verifyCaptchaTask` 내부에서 호출됩니다.
 
         Args:
             clientToken (str): 클라이언트로부터 헤더로 받은 고유 토큰.
@@ -144,7 +169,7 @@ class CaptchaService:
         """
         try:
             # 1. 클라이언트 토큰을 사용하여 캡챠 세션 정보를 데이터베이스에서 조회합니다.
-            # 2025-09-08 DEBUG_001: TIMEOUT 로그 중복 문제를 해결하기 위해 getCaptchaSessionByClientToken 호출 시 for_update=True 옵션을 사용하여 레코드에 잠금을 설정합니다.
+            # 동시성 문제를 방지하기 위해 레코드에 비관적 잠금(for_update=True)을 설정합니다.
             session = self.captchaRepo.getCaptchaSessionByClientToken(
                 clientToken, for_update=True)
 
@@ -169,8 +194,8 @@ class CaptchaService:
 
             # 5. 현재 시간과 세션 생성 시간의 차이를 계산하여 경과 시간(latency)을 구합니다.
             latency = datetime.now(settings.TIMEZONE) - session.createdAt
-            # 6. 경과 시간이 3분을 초과한 경우, 타임아웃으로 처리합니다.
-            if latency > timedelta(minutes=3):
+            # 6. 경과 시간이 설정된 타임아웃(기본 3분)을 초과한 경우, 타임아웃으로 처리합니다.
+            if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 # 타임아웃 결과를 로그에 기록합니다.
                 self.captchaRepo.createCaptchaLog(
                     session=session,
