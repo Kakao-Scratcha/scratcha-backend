@@ -31,9 +31,6 @@ class Settings:
     # 캡챠 타임아웃 설정 (분)
     CAPTCHA_TIMEOUT_MINUTES: int = 3
 
-    # S3 기본 URL
-    S3_BASE_URL: str = os.getenv("S3_BASE_URL")
-
     # 데이터베이스 URL
     DATABASE_URL: str = os.getenv("DATABASE_URL")
 
@@ -69,6 +66,24 @@ class Settings:
     )
     # Celery 작업 결과를 저장할 백엔드를 설정합니다.
     CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", "rpc://")
+
+    # S3/KS3 설정
+    KS3_ENDPOINT: str = os.getenv("KS3_ENDPOINT")
+    KS3_REGION: str = os.getenv("KS3_REGION", "ap-northeast-2")
+    KS3_BUCKET: str = os.getenv("KS3_BUCKET")
+    KS3_ACCESS_KEY: str = os.getenv("KS3_ACCESS_KEY")
+    KS3_SECRET_KEY: str = os.getenv("KS3_SECRET_KEY")
+    KS3_PREFIX: str = os.getenv("KS3_PREFIX", "")
+    KS3_FORCE_PATH_STYLE: bool = os.getenv("KS3_FORCE_PATH_STYLE", "1") == "1"
+
+    KS3_BASE_URL: str = os.getenv("KS3_BASE_URL")
+
+    @property
+    def ENABLE_KS3(self) -> bool:
+        _enable = os.getenv("KS3_ENABLE")
+        if _enable is None:
+            return all([self.KS3_BUCKET, self.KS3_ENDPOINT, self.KS3_ACCESS_KEY, self.KS3_SECRET_KEY])
+        return _enable == "1"
 
 
 # 설정 클래스의 인스턴스를 생성하여 애플리케이션 전체에서 사용합니다.

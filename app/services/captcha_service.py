@@ -1,14 +1,17 @@
 # app/services/captcha_service.py
 
+import logging
+import os
+import json
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List, Tuple
+import uuid
+import random
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-import uuid
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
-import os
-import random
-from app.core.config import settings
 
+from app.core.config import settings
 from app.models.api_key import ApiKey
 from app.models.user import User
 from app.repositories.captcha_repo import CaptchaRepository
@@ -16,6 +19,9 @@ from app.repositories.usage_stats_repo import UsageStatsRepository
 from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationRequest, CaptchaVerificationResponse
 from app.models.captcha_log import CaptchaResult
 from app.services import behavior_service
+
+# 로거 설정
+logger = logging.getLogger(__name__)
 
 
 class CaptchaService:
@@ -40,13 +46,13 @@ class CaptchaService:
             clientToken (str): 검증할 캡챠 세션의 고유 클라이언트 토큰입니다.
             request (CaptchaVerificationRequest): 사용자가 제출한 답변과 행동 데이터를 담은 요청 모델입니다.
             ipAddress (Optional[str]): 사용자 요청의 IP 주소입니다.
-            userAgent (Optional[str]): 사용자 요청의 User-Agent 문자열입니다.
+            userAgent (Optional[str]): 클라이언트의 User-Agent 문자열입니다.
 
         Returns:
             str: 생성된 Celery 작업의 고유 ID.
         """
         # 순환 참조를 방지하기 위해 함수 내에서 task를 임포트합니다.
-        from app.tasks.captcha_tasks import verifyCaptchaTask
+        from app.tasks.captcha_tasks import verifyCaptchaTask, uploadBehaviorDataTask
 
         # .delay()를 사용하여 작업을 메시지 큐에 전달합니다.
         # 인자들은 Celery에 의해 직렬화되어 워커 프로세스로 전달됩니다.
@@ -58,6 +64,11 @@ class CaptchaService:
             meta=request.meta,
             events=request.events
         )
+
+        # 행동 데이터 업로드를 비동기 작업으로 처리
+        if settings.ENABLE_KS3:
+            uploadBehaviorDataTask.delay(clientToken, request.dict())
+
         return task.id
 
     def generateCaptchaProblem(self, apiKey: ApiKey, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaProblemResponse:
@@ -111,11 +122,11 @@ class CaptchaService:
             )
 
             # 8. S3_BASE_URL 환경 변수를 가져와 전체 이미지 URL을 구성합니다.
-            s3BaseUrl = settings.S3_BASE_URL
+            s3BaseUrl = settings.KS3_BASE_URL
             if not s3BaseUrl:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="S3_BASE_URL 환경 변수가 설정되지 않았습니다."
+                    detail="KS3_BASE_URL 환경 변수가 설정되지 않았습니다." # Changed from S3_BASE_URL
                 )
 
             # S3 이미지 키와 S3_BASE_URL을 조합하여 클라이언트가 직접 접근할 수 있는 전체 URL을 생성합니다.
@@ -151,7 +162,6 @@ class CaptchaService:
             self.db.rollback()
             raise e
         except Exception as e:
-            # 14. 그 외 예상치 못한 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 500 Internal Server Error를 발생시킵니다.
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -202,7 +212,10 @@ class CaptchaService:
                 self.captchaRepo.createCaptchaLog(
                     session=session,
                     result=CaptchaResult.TIMEOUT,
-                    latency_ms=int(latency.total_seconds() * 1000)
+                    latency_ms=int(latency.total_seconds() * 1000),
+                    is_correct=False, # Timeout implies incorrect
+                    ml_confidence=None,
+                    ml_is_bot=None
                 )
                 usageStatsRepo = UsageStatsRepository(self.db)
                 usageStatsRepo.incrementVerificationResult(
@@ -214,11 +227,16 @@ class CaptchaService:
             confidence = None
             verdict = None
             if request.meta and request.events:
+                logger.debug(f"행동 데이터 메타: {request.meta}")
+                logger.debug(f"행동 이벤트: {request.events}")
                 behavior_result = behavior_service.run_behavior_verification(
                     request.meta, request.events)
+                logger.debug(f"행동 분석 결과: {behavior_result}")
                 if behavior_result and behavior_result.get("ok"):
                     confidence = behavior_result.get("bot_prob")
                     verdict = behavior_result.get("verdict")
+                    logger.debug(
+                        f"할당된 신뢰도: {confidence}, 판정: {verdict}")
 
             # 7. 세션에 연결된 캡챠 문제의 정답을 가져옵니다.
             correct_answer = session.captchaProblem.answer
@@ -226,14 +244,22 @@ class CaptchaService:
             is_correct = request.answer == correct_answer
 
             # 9. 성공 여부에 따라 결과(SUCCESS/FAIL)와 메시지를 설정합니다.
-            result = CaptchaResult.SUCCESS if is_correct else CaptchaResult.FAIL
-            message = "캡챠 검증에 성공했습니다." if is_correct else "캡챠 검증에 실패했습니다."
+            # result = CaptchaResult.SUCCESS if is_correct else CaptchaResult.FAIL # Old logic
+            if is_correct and verdict == "human":
+                result = CaptchaResult.SUCCESS
+                message = "캡챠 검증에 성공했습니다."
+            else:
+                result = CaptchaResult.FAIL
+                message = "캡챠 검증에 실패했습니다."
 
             # 10. 검증 결과를 로그에 기록합니다.
             self.captchaRepo.createCaptchaLog(
                 session=session,
                 result=result,
-                latency_ms=int(latency.total_seconds() * 1000)
+                latency_ms=int(latency.total_seconds() * 1000),
+                is_correct=is_correct,
+                ml_confidence=confidence,
+                ml_is_bot=(verdict == "bot") if verdict else None # Convert verdict to boolean
             )
 
             # 11. API 키 사용 통계에 검증 결과를 업데이트합니다.

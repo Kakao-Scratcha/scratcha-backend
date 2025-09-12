@@ -1,7 +1,7 @@
 # app/tasks/captcha_tasks.py
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException
 
@@ -12,8 +12,96 @@ from app.models.captcha_log import CaptchaResult
 from app.schemas.captcha import CaptchaVerificationRequest
 from db.session import SessionLocal
 
+import os
+import json
+import io
+import gzip
+import boto3
+from botocore.config import Config
+from pydantic import BaseModel
+
 # 로거 설정
 logger = logging.getLogger(__name__)
+
+# ===== KS3/S3 helpers (copied from captcha_service.py) =====
+
+
+def model_dump_compat(obj, *, exclude_none: bool = True):
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump(exclude_none=exclude_none)
+    if hasattr(obj, "dict"):
+        return obj.dict(exclude_none=exclude_none)
+    return obj
+
+
+def _ks3_client():
+    cfg = Config(
+        s3={"addressing_style": "path" if settings.KS3_FORCE_PATH_STYLE else "virtual"},
+        signature_version="s3v4",
+        retries={"max_attempts": 3, "mode": "standard"},
+    )
+    session = boto3.session.Session(
+        aws_access_key_id=settings.KS3_ACCESS_KEY,
+        aws_secret_access_key=settings.KS3_SECRET_KEY,
+        region_name=settings.KS3_REGION or "ap-northeast-2",
+    )
+    return session.client("s3", endpoint_url=settings.KS3_ENDPOINT, config=cfg)
+
+
+def _make_session_key(session_id: str, gz: bool = True) -> str:
+    ts = datetime.now(settings.TIMEZONE).strftime("%Y%m%d-%H%M%S")
+    fname = f"{ts}_{session_id}.json" + (".gz" if gz else "")
+    return f"{settings.KS3_PREFIX.strip('/')}/{fname}".strip("/")
+
+
+def _serialize_jsonl_bytes(payload: CaptchaVerificationRequest) -> bytes:
+    meta = model_dump_compat(payload.meta, exclude_none=True)
+    events = [model_dump_compat(e, exclude_none=True) for e in payload.events]
+    lines = [json.dumps({"type": "meta", **meta}, ensure_ascii=False)]
+    for ev in events:
+        lines.append(json.dumps({"type": "event", **ev}, ensure_ascii=False))
+    # Assuming label is not part of CaptchaVerificationRequest for now, or needs to be added
+    # if payload.label:
+    #     lines.append(json.dumps({"type": "label", **payload.label}, ensure_ascii=False))
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def _gzip_bytes(raw: bytes) -> bytes:
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=6, mtime=0) as gz:
+        gz.write(raw)
+    return buf.getvalue()
+
+def upload_ks3_session(payload: CaptchaVerificationRequest, session_id: str):
+    if not settings.ENABLE_KS3 or not settings.KS3_BUCKET or not settings.KS3_ACCESS_KEY or not settings.KS3_SECRET_KEY or not settings.KS3_ENDPOINT:
+        missing = []
+        if not settings.ENABLE_KS3:
+            missing.append("KS3_ENABLE(auto)==False")
+        if not settings.KS3_BUCKET:
+            missing.append("KS3_BUCKET")
+        if not settings.KS3_ACCESS_KEY:
+            missing.append("KS3_ACCESS_KEY")
+        if not settings.KS3_SECRET_KEY:
+            missing.append("KS3_SECRET_KEY")
+        if not settings.KS3_ENDPOINT:
+            missing.append("KS3_ENDPOINT")
+        logger.warning(
+            f"S3 업로드 건너뜀: 설정 누락됨: {', '.join(missing)}")
+        return (None, None, f"Missing: {', '.join(missing)}")
+    try:
+        body = _serialize_jsonl_bytes(payload)
+        gz = _gzip_bytes(body)
+        key = _make_session_key(session_id, gz=True)
+        s3 = _ks3_client()
+        s3.put_object(
+            Bucket=settings.KS3_BUCKET, Key=key, Body=gz,
+            ContentType="application/json", ContentEncoding="gzip",
+        )
+        logger.info(f"KS3 업로드 성공: s3://{settings.KS3_BUCKET}/{key}")
+        return (f"s3://{settings.KS3_BUCKET}/{key}", key, len(gz))
+    except Exception as e:
+        logger.error(f"KS3 업로드 오류: {e}")
+        return (None, None, f"upload error: {e}")
 
 
 @celery_app.task(bind=True)
@@ -58,7 +146,12 @@ def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userA
             userAgent=userAgent
         )
         # Celery는 직렬화 가능한 결과만 반환할 수 있으므로, Pydantic 모델을 dict로 변환합니다.
-        return result.dict()
+        return {
+            "result": result.result,
+            "message": result.message,
+            "confidence": result.confidence,
+            "verdict": result.verdict
+        }
     except HTTPException as e:
         # 서비스 로직에서 발생한 HTTPException을 Celery 실패 상태로 기록합니다.
         # 클라이언트는 결과 조회 API를 통해 실패 사실과 원인을 알 수 있습니다.
@@ -74,6 +167,23 @@ def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userA
     finally:
         # 작업이 성공하든 실패하든, 사용된 데이터베이스 세션은 반드시 닫아줍니다.
         db.close()
+
+
+@celery_app.task
+def uploadBehaviorDataTask(clientToken: str, request_data: Dict[str, Any]):
+    """
+    행동 데이터를 S3/KS3에 비동기적으로 업로드하는 Celery 작업입니다.
+    """
+    logger.info(f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 중...")
+    try:
+        # Reconstruct CaptchaVerificationRequest from dict
+        request = CaptchaVerificationRequest(**request_data)
+        upload_ks3_session(request, clientToken)
+        logger.info(
+            f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 성공")
+    except Exception as e:
+        logger.error(
+            f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 오류: {e}")
 
 
 @celery_app.task
@@ -97,7 +207,7 @@ def cleanupExpiredSessionsTask():
         timeoutThreshold = datetime.now(
             settings.TIMEZONE) - timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES)
 
-        # 타임아웃 기준점을 지났고, 아직 로그가 없는 세션들을 조회합니다.
+        # 타임아웃 기준점을 지났고, 아직 로그(성공/실패/타임아웃)가 없는 세션들을 조회합니다.
         # with_for_update(skip_locked=True)를 사용하여 여러 워커가 동시에 같은 세션을 처리하는 것을 방지합니다.
         # 이미 다른 워커에 의해 잠긴(처리 중인) 세션은 건너뜁니다.
         expiredSessions = db.query(CaptchaSession).filter(
@@ -106,7 +216,7 @@ def cleanupExpiredSessionsTask():
         ).with_for_update(skip_locked=True).all()
 
         if expiredSessions:
-            logger.info(f"{len(expiredSessions)} 개의 만료된 세션 발견, 타임아웃 처리 시작")
+            logger.info(f"{len(expiredSessions)}개의 만료된 세션 발견, 타임아웃 처리 시작")
 
             for session in expiredSessions:
                 # 세션 생성 시간이 타임존 정보를 포함하도록 보정합니다.
@@ -129,8 +239,8 @@ def cleanupExpiredSessionsTask():
                         latency.total_seconds() * 1000)
                 )
                 logger.info(
-                    f"세션 만료(TIMEOUT) : [세션 ID={session.id}, 클라이언트 토큰={session.clientToken}]")
-            
+                    f"세션 만료(TIMEOUT): [세션 ID={session.id}, 클라이언트 토큰={session.clientToken}]")
+
             # 모든 변경사항을 데이터베이스에 한 번에 커밋합니다.
             db.commit()
     except Exception as e:

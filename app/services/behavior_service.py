@@ -44,8 +44,9 @@ class CNN1D(nn.Module):
 # /app/app/services/behavior_service.py -> /app/app
 APP_DIR = Path(__file__).resolve().parent.parent
 ARTIFACTS_DIR = APP_DIR / "artifacts"
-BEST_PT = ARTIFACTS_DIR / "best.pt"
-THR_JSON = ARTIFACTS_DIR / "thresholds.json"
+BEST_PT = ARTIFACTS_DIR / "cnn" / "best.pt"
+THR_JSON = ARTIFACTS_DIR / "cnn" / "thresholds.json"
+CALIB_JSON = ARTIFACTS_DIR / "cnn" / "calibration.json"
 
 _MODEL: Optional[nn.Module] = None
 _THRESHOLD: Optional[float] = None
@@ -61,7 +62,7 @@ def _load_threshold_once() -> float:
         with open(THR_JSON, "r", encoding="utf-8") as f:
             _THRESHOLD = float(json.load(f).get("val_threshold", 0.5))
     except Exception as e:
-        logger.warning(f"[WARN] thresholds.json load failed: {e}")
+        logger.warning(f"[경고] thresholds.json 로드 실패: {e}")
         _THRESHOLD = 0.5
     return _THRESHOLD
 
@@ -84,12 +85,40 @@ def get_model() -> Optional[nn.Module]:
             m.load_state_dict(state, strict=True)
             m.eval()
             _MODEL = m
-            logger.info(f"[OK] Loaded best.pt from {BEST_PT}")
+            logger.info(f"[확인] best.pt 로드 완료: {BEST_PT}")
         except Exception as e:
-            logger.warning(f"[WARN] best.pt load failed: {e}")
+            logger.warning(f"[경고] best.pt 로드 실패: {e}")
             _MODEL = None
         return _MODEL
 
+# ====== Calibration (temperature / platt) ======
+_CALIB = None
+_CALIB_MTIME = None
+
+def _load_calibration():
+    """
+    calibration.json mtime을 보고 자동 리로드.
+    지원: {"type":"temperature","T":...}  |  {"type":"platt","a":...,"b":...}
+    """
+    global _CALIB, _CALIB_MTIME
+    try:
+        st = CALIB_JSON.stat()
+        if _CALIB is not None and _CALIB_MTIME == st.st_mtime:
+            return _CALIB  # 캐시 유효
+        with open(CALIB_JSON, "r", encoding="utf-8") as f:
+            obj = json.load(f)
+        t = str(obj.get("type", "")).lower()
+        if t == "temperature":
+            _CALIB = ("temperature", float(obj["T"]))
+        elif t == "platt":
+            _CALIB = ("platt", float(obj["a"]), float(obj["b"]))
+        else:
+            _CALIB = None
+        _CALIB_MTIME = st.st_mtime
+    except Exception:
+        _CALIB = None
+        _CALIB_MTIME = None
+    return _CALIB
 
 # ====== Temperature scaling =====
 LOGIT_TEMPERATURE = float(os.getenv("LOGIT_TEMPERATURE", "2.0"))
@@ -101,8 +130,7 @@ LOGIT_TEMPERATURE = float(os.getenv("LOGIT_TEMPERATURE", "2.0"))
 
 def _to_rect(d):
     try:
-        L, T, W, H = float(d["left"]), float(
-            d["top"]), float(d["w"]), float(d["h"])
+        L, T, W, H = float(d.get("left")), float(d.get("top")), float(d.get("w")), float(d.get("h"))
         if W <= 0 or H <= 0:
             return None
         return (L, T, W, H)
@@ -131,21 +159,17 @@ def _roi_rects(meta: Any) -> Tuple[Optional[Tuple[float, float, float, float]], 
 # ---------- 이벤트 평탄화 ----------
 
 
-def _flatten_events(events: List[Any]):
+def _flatten_events(meta: Any, events: List[Any]):
     out = []
     for ev in events:
-        # ev가 dict일 경우를 대비
-        et = ev.get("type")
+        et = getattr(ev, "type", None) or (ev.get("type") if isinstance(ev, dict) else None)
         if et in ("moves", "moves_free"):
-            p = ev.get("payload")
-            if not p:
-                logger.debug(
-                    f"_flatten_events: moves 이벤트 payload 없음, 건너뜀: {ev}")
-                continue
-            base = int(p.get("base_t", 0) or 0)
-            dts = list(p.get("dts", []) or [])
-            xs = list(p.get("xrs", []) or [])
-            ys = list(p.get("yrs", []) or [])
+            p = getattr(ev, "payload", None) or (ev.get("payload") if isinstance(ev, dict) else None)
+            if not p: continue
+            base = int(getattr(p, "base_t", 0) or (p.get("base_t") if isinstance(p, dict) else 0) or 0)
+            dts  = list(getattr(p, "dts", []) or (p.get("dts") if isinstance(p, dict) else []) or [])
+            xs   = list(getattr(p, "xrs", []) or (p.get("xrs") if isinstance(p, dict) else []) or [])
+            ys   = list(getattr(p, "yrs", []) or (p.get("yrs") if isinstance(p, dict) else []) or [])
             t = base
             n = min(len(dts), len(xs), len(ys))
             for i in range(n):
@@ -153,13 +177,10 @@ def _flatten_events(events: List[Any]):
                 dt = int(dts[i]) if int(dts[i]) > 0 else 1
                 t += dt
         elif et in ("pointerdown", "pointerup", "click"):
-            t = ev.get("t")
-            xr = ev.get("x_raw")
-            yr = ev.get("y_raw")
-            if t is None or xr is None or yr is None:
-                logger.debug(
-                    f"_flatten_events: pointer/click 이벤트 필수 필드 누락 (t:{t}, xr:{xr}, yr:{yr}), 건너뜀: {ev}")
-                continue
+            t  = (getattr(ev, "t", None) if not isinstance(ev, dict) else ev.get("t"))
+            xr = (getattr(ev, "x_raw", None) if not isinstance(ev, dict) else ev.get("x_raw"))
+            yr = (getattr(ev, "y_raw", None) if not isinstance(ev, dict) else ev.get("y_raw"))
+            if t is None or xr is None or yr is None: continue
             out.append((int(t), float(xr), float(yr)))
     out.sort(key=lambda x: x[0])
     logger.debug(f"_flatten_events 결과: {len(out)}개의 포인트, 첫 5개: {out[:5]}")
@@ -168,21 +189,32 @@ def _flatten_events(events: List[Any]):
 # ---------- 시간 단위 보정 (sec/ms/us → ms) ----------
 
 
-def _fix_time_units_to_ms(ts_ms_like: np.ndarray) -> np.ndarray:
-    ts = np.asarray(ts_ms_like, dtype=np.float64)
-    if ts.size < 2:
-        return ts
-    diffs = np.diff(ts)
-    diffs = diffs[diffs > 0]
-    if diffs.size == 0:
-        return ts
-    med = float(np.median(diffs))
-    if med <= 0.01:     # 초 단위로 보임 → ms로 승격
-        return ts * 1000.0
-    if med >= 1000.0:   # us 단위로 보임 → ms로 강등
-        return ts / 1000.0
-    return ts
+def _time_scale_to_ms(t: np.ndarray) -> Tuple[np.ndarray, str]:
+    """
+    규칙 (build_dataset.py와 동일):
+    - 이미 ms: rng>=1000ms 또는 med_dt>=5ms → 그대로
+    - 초 단위: 0.2<=med_dt<=5.0 and rng<=600 → *1000
+    - 프레임 인덱스(60/30Hz): 0.8<=med_dt<=1.2 → *16  (보수적 16ms)
+    - 범위가 너무 작음(rng<100ms): 인덱스 재생성 → idx*16
+    - 그 외: ms로 간주 (fallback)
+    """
+    if t.size < 2:
+        return t, "time_ok_len1"
+    t = t.astype(np.float64)
+    rng = float(t[-1] - t[0])
+    dt = np.diff(t)
+    med_dt = float(np.median(dt)) if dt.size else 0.0
 
+    if rng >= 1000.0 or med_dt >= 5.0:
+        return t, "time_ms"
+    if 0.2 <= med_dt <= 5.0 and rng <= 600.0:
+        return t * 1000.0, "time_seconds_scaled_ms"
+    if 0.8 <= med_dt <= 1.2:
+        return t * 16.0, "time_frames_scaled_ms"
+    if rng < 100.0:
+        idx = np.arange(len(t), dtype=np.float64)
+        return idx * 16.0, "time_reindexed_16ms"
+    return t, "time_ms_fallback"
 
 def _norm_xy(x_raw: float, y_raw: float, rect: Tuple[float, float, float, float]):
     L, T, W, H = rect
@@ -208,7 +240,7 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
         # 🔒 canvas가 없으면 모델 입력을 만들지 않음(폴백 금지)
         return None, 0, False, (rect_oob is not None), 0.0, 0.0
 
-    pts = _flatten_events(events)
+    pts = _flatten_events(meta, events)
     if not pts:
         logger.warning(
             f"build_window_7ch: 평탄화된 이벤트(pts)가 없으므로 전처리 건너뜀. events: {events}")
@@ -233,8 +265,8 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
     ys = np.asarray(ys, dtype=np.float32)
     oobs_canvas = np.asarray(oobs_canvas, dtype=np.float32)
     oobs_wrap = np.asarray(oobs_wrap, dtype=np.float32)
-    ts = _fix_time_units_to_ms(np.asarray(
-        ts, dtype=np.float64))  # 2) 시간 보정(ms)
+    ts = np.asarray(ts, dtype=np.float64)
+    ts, _ = _time_scale_to_ms(ts) # 2) 시간 보정(ms)
 
     # 3) dt (sec)
     dt_ms = np.diff(ts, prepend=ts[0])
@@ -300,14 +332,14 @@ def seq_stats(X, raw_len: int, has_track: bool, has_wrap: bool, oob_canvas_rate:
 def run_behavior_verification(meta: Dict[str, Any], events: List[Dict[str, Any]]):
     model = get_model()
     if model is None:
-        logger.error("Behavior verification model is not loaded.")
+        logger.error("행동 검증 모델이 로드되지 않았습니다.")
         return {"ok": False, "error": "model not loaded"}
 
     # (전처리)
     X, raw_len, has_track, has_wrap, oob_c, oob_w = build_window_7ch(
         meta, events, T=300)
     if X is None:
-        logger.warning("Feature extraction returned None. Skipping inference.")
+        logger.warning("특징 추출 결과가 None입니다. 추론을 건너뜁니다.")
         return {"ok": False, "error": "empty or invalid events/roi"}
 
     # (추론)
@@ -316,10 +348,21 @@ def run_behavior_verification(meta: Dict[str, Any], events: List[Dict[str, Any]]
     with torch.no_grad():
         logit = model(xt).item()
 
-    # (후처리) Temperature scaling: prob = sigmoid(logit / T)
-    T = max(1e-6, LOGIT_TEMPERATURE)
-    z = logit / T
-    prob = float(1.0 / (1.0 + np.exp(-np.clip(z, -20.0, 20.0))))
+    # (후처리) Calibration 우선순위: temperature → platt
+    calib = _load_calibration()
+    if calib and calib[0] == "temperature":
+        T = max(1.0, float(calib[1]))   # ← 안전: 최소 1.0로 고정
+        z = logit / T
+    elif calib and calib[0] == "platt":
+        a, b = float(calib[1]), float(calib[2])
+        z = a * logit + b
+    else:
+        T = 2.0  # 기본 Temperature
+        z = logit / T
+
+    z_raw = float(z)
+    z_clip = float(np.clip(z_raw, -3.0, 3.0))  # 시그모이드 전 클립
+    prob = float(1.0 / (1.0 + np.exp(-z_clip)))
 
     thr = float(get_threshold())
     verdict = "bot" if prob >= thr else "human"

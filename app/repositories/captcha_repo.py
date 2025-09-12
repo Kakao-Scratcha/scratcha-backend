@@ -93,7 +93,7 @@ class CaptchaRepository:
             query = query.with_for_update()
         return query.first()
 
-    def createCaptchaLog(self, session: CaptchaSession, result: CaptchaResult, latency_ms: int):
+    def createCaptchaLog(self, session: CaptchaSession, result: CaptchaResult, latency_ms: int, is_correct: Optional[bool], ml_confidence: Optional[float], ml_is_bot: Optional[bool]):
         """
         캡챠 검증 결과를 로그로 기록합니다.
         """
@@ -101,7 +101,10 @@ class CaptchaRepository:
             keyId=session.keyId,
             sessionId=session.id,
             result=result,
-            latency_ms=latency_ms
+            latency_ms=latency_ms,
+            is_correct=is_correct,
+            ml_confidence=ml_confidence,
+            ml_is_bot=ml_is_bot
         )
         self.db.add(log_entry)
 

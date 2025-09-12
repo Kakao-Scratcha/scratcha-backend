@@ -68,6 +68,16 @@ class CaptchaVerificationResponse(BaseModel):
         description="검증 결과에 대한 메시지",
         example="캡챠 검증에 성공했습니다."
     )
+    confidence: Optional[float] = Field(
+        None,
+        description="봇 확률 또는 신뢰도 (0.0 ~ 1.0)",
+        example=0.95
+    )
+    verdict: Optional[Literal["bot", "human", "unclear"]] = Field(
+        None,
+        description="행동 분석을 통한 봇/사람 판정",
+        example="bot"
+    )
 
 
 class CaptchaTaskResponse(BaseModel):
