@@ -8,7 +8,7 @@ from db.session import get_db
 from app.services.api_key_service import ApiKeyService
 from app.schemas.api_key import ApiKeyResponse, ApiKeyUpdate
 from app.models.api_key import Difficulty
-from app.core.security import getCurrentUser
+from app.core.security import getAuthenticatedUser # Updated import
 from app.models.user import User
 
 # API 라우터 객체 생성
@@ -17,19 +17,6 @@ router = APIRouter(
     tags=["API Keys"],
     responses={404: {"description": "Not found"}},
 )
-
-
-def getApiKeyService(db: Session = Depends(get_db)) -> ApiKeyService:
-    """
-    FastAPI 의존성 주입을 통해 ApiKeyService 인스턴스를 생성하고 반환합니다.
-
-    Args:
-        db (Session, optional): `get_db` 의존성에서 제공하는 데이터베이스 세션.
-
-    Returns:
-        ApiKeyService: ApiKeyService의 인스턴스.
-    """
-    return ApiKeyService(db)
 
 
 @router.post(
@@ -45,8 +32,8 @@ def createKey(
         0, embed=True, description="API 키 만료 정책(일 단위, 0 또는 음수는 무제한)"),
     difficulty: Difficulty = Body(
         Difficulty.MIDDLE, embed=True, description="캡챠 난이도"),
-    currentUser: User = Depends(getCurrentUser),
-    apiKeyService: ApiKeyService = Depends(getApiKeyService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     애플리케이션 ID(`appId`)를 받아 해당 애플리케이션에 대한 새 API 키를 생성합니다.
@@ -60,10 +47,12 @@ def createKey(
     Returns:
         ApiKeyResponse: 생성된 API 키의 상세 정보.
     """
-    # 1. 인증된 사용자와 요청된 정보를 바탕으로 API 키 생성 서비스를 호출합니다.
+    # 1. ApiKeyService 인스턴스 생성
+    apiKeyService = ApiKeyService(db)
+    # 2. 인증된 사용자와 요청된 정보를 바탕으로 API 키 생성 서비스를 호출합니다.
     newApiKey = apiKeyService.createKey(
-        currentUser, appId, expiresPolicy, difficulty)
-    # 2. 생성된 API 키 정보를 반환합니다.
+        authenticatedUser, appId, expiresPolicy, difficulty)
+    # 3. 생성된 API 키 정보를 반환합니다.
     return newApiKey
 
 
@@ -75,8 +64,8 @@ def createKey(
     description="현재 인증된 사용자가 소유한 모든 API 키 목록을 조회합니다.",
 )
 def getKeys(
-    currentUser: User = Depends(getCurrentUser),
-    apiKeyService: ApiKeyService = Depends(getApiKeyService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     현재 인증된 사용자의 모든 API 키 목록을 조회합니다.
@@ -88,9 +77,11 @@ def getKeys(
     Returns:
         List[ApiKeyResponse]: 사용자의 API 키 목록.
     """
-    # 1. 현재 사용자의 모든 API 키를 조회하는 서비스를 호출합니다.
-    userKeys = apiKeyService.getKeys(currentUser)
-    # 2. 조회된 키 목록을 반환합니다.
+    # 1. ApiKeyService 인스턴스 생성
+    apiKeyService = ApiKeyService(db)
+    # 2. 현재 사용자의 모든 API 키를 조회하는 서비스를 호출합니다.
+    userKeys = apiKeyService.getKeys(authenticatedUser)
+    # 3. 조회된 키 목록을 반환합니다.
     return userKeys
 
 
@@ -103,8 +94,8 @@ def getKeys(
 )
 def getKey(
     keyId: int,
-    currentUser: User = Depends(getCurrentUser),
-    apiKeyService: ApiKeyService = Depends(getApiKeyService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     API 키 ID(`keyId`)로 특정 API 키의 정보를 조회합니다.
@@ -117,9 +108,11 @@ def getKey(
     Returns:
         ApiKeyResponse: 조회된 API 키의 상세 정보.
     """
-    # 1. 특정 API 키를 조회하는 서비스를 호출합니다.
-    apiKey = apiKeyService.getKey(keyId, currentUser)
-    # 2. 조회된 키 정보를 반환합니다.
+    # 1. ApiKeyService 인스턴스 생성
+    apiKeyService = ApiKeyService(db)
+    # 2. 특정 API 키를 조회하는 서비스를 호출합니다.
+    apiKey = apiKeyService.getKey(keyId, authenticatedUser)
+    # 3. 조회된 키 정보를 반환합니다.
     return apiKey
 
 
@@ -132,8 +125,8 @@ def getKey(
 )
 def activateKey(
     keyId: int,
-    currentUser: User = Depends(getCurrentUser),
-    apiKeyService: ApiKeyService = Depends(getApiKeyService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     API 키 ID(`keyId`)에 해당하는 API 키를 활성화합니다.
@@ -146,9 +139,11 @@ def activateKey(
     Returns:
         ApiKeyResponse: 활성화된 API 키의 상세 정보.
     """
-    # 1. API 키를 활성화하는 서비스를 호출합니다.
-    activatedKey = apiKeyService.activateKey(keyId, currentUser)
-    # 2. 변경된 키 정보를 반환합니다.
+    # 1. ApiKeyService 인스턴스 생성
+    apiKeyService = ApiKeyService(db)
+    # 2. API 키를 활성화하는 서비스를 호출합니다.
+    activatedKey = apiKeyService.activateKey(keyId, authenticatedUser)
+    # 3. 변경된 키 정보를 반환합니다.
     return activatedKey
 
 
@@ -161,8 +156,8 @@ def activateKey(
 )
 def deactivateKey(
     keyId: int,
-    currentUser: User = Depends(getCurrentUser),
-    apiKeyService: ApiKeyService = Depends(getApiKeyService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     API 키 ID(`keyId`)에 해당하는 API 키를 비활성화합니다.
@@ -175,9 +170,11 @@ def deactivateKey(
     Returns:
         ApiKeyResponse: 비활성화된 API 키의 상세 정보.
     """
-    # 1. API 키를 비활성화하는 서비스를 호출합니다.
-    deactivatedKey = apiKeyService.deactivateKey(keyId, currentUser)
-    # 2. 변경된 키 정보를 반환합니다.
+    # 1. ApiKeyService 인스턴스 생성
+    apiKeyService = ApiKeyService(db)
+    # 2. API 키를 비활성화하는 서비스를 호출합니다.
+    deactivatedKey = apiKeyService.deactivateKey(keyId, authenticatedUser)
+    # 3. 변경된 키 정보를 반환합니다.
     return deactivatedKey
 
 
@@ -190,8 +187,8 @@ def deactivateKey(
 )
 def deleteKey(
     keyId: int,
-    currentUser: User = Depends(getCurrentUser),
-    apiKeyService: ApiKeyService = Depends(getApiKeyService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     API 키 ID(`keyId`)에 해당하는 API 키를 소프트 삭제합니다.
@@ -204,9 +201,11 @@ def deleteKey(
     Returns:
         ApiKeyResponse: 삭제 처리된 API 키의 상세 정보.
     """
-    # 1. API 키를 삭제하는 서비스를 호출합니다.
-    deletedKey = apiKeyService.deleteKey(keyId, currentUser)
-    # 2. 변경된 키 정보를 반환합니다.
+    # 1. ApiKeyService 인스턴스 생성
+    apiKeyService = ApiKeyService(db)
+    # 2. API 키를 삭제하는 서비스를 호출합니다.
+    deletedKey = apiKeyService.deleteKey(keyId, authenticatedUser)
+    # 3. 변경된 키 정보를 반환합니다.
     return deletedKey
 
 
@@ -220,8 +219,8 @@ def deleteKey(
 def updateKey(
     keyId: int,
     apiKeyUpdate: ApiKeyUpdate,
-    currentUser: User = Depends(getCurrentUser),
-    apiKeyService: ApiKeyService = Depends(getApiKeyService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     API 키 ID(`keyId`)에 해당하는 API 키의 정보를 업데이트합니다.
@@ -235,7 +234,9 @@ def updateKey(
     Returns:
         ApiKeyResponse: 업데이트된 API 키의 상세 정보.
     """
-    # 1. API 키를 업데이트하는 서비스를 호출합니다.
-    updatedKey = apiKeyService.updateKey(keyId, currentUser, apiKeyUpdate)
-    # 2. 변경된 키 정보를 반환합니다.
+    # 1. ApiKeyService 인스턴스 생성
+    apiKeyService = ApiKeyService(db)
+    # 2. API 키를 업데이트하는 서비스를 호출합니다.
+    updatedKey = apiKeyService.updateKey(keyId, authenticatedUser, apiKeyUpdate)
+    # 3. 변경된 키 정보를 반환합니다.
     return updatedKey

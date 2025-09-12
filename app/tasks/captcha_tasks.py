@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List
 from fastapi import HTTPException
 
 from app.celery_app import celery_app
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True)
-def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userAgent: str):
+def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userAgent: str, meta: Optional[Dict[str, Any]] = None, events: Optional[List[Dict[str, Any]]] = None):
     """
     Celery를 사용하여 캡챠 답변을 비동기적으로 검증하는 작업입니다.
 
@@ -29,6 +30,8 @@ def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userA
         answer (str): 사용자가 제출한 답변입니다.
         ipAddress (str): 사용자 요청의 IP 주소입니다.
         userAgent (str): 사용자 요청의 User-Agent 문자열입니다.
+        meta (Optional[Dict[str, Any]]): 행동 데이터 메타 정보입니다.
+        events (Optional[List[Dict[str, Any]]]): 사용자 행동 이벤트 데이터입니다.
 
     Returns:
         dict: 검증 결과를 담은 딕셔너리. 성공 시 `CaptchaVerificationResponse` 스키마와 호환됩니다.
@@ -44,7 +47,8 @@ def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userA
     db = SessionLocal()
     try:
         captchaService = CaptchaService(db)
-        verificationRequest = CaptchaVerificationRequest(answer=answer)
+        verificationRequest = CaptchaVerificationRequest(
+            answer=answer, meta=meta, events=events)
 
         # 동기 방식과 동일한 검증 서비스를 호출합니다.
         result = captchaService.verifyCaptchaAnswer(

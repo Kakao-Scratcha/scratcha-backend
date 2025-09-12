@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any, List
 import os
 import random
 from app.core.config import settings
@@ -15,6 +15,7 @@ from app.repositories.captcha_repo import CaptchaRepository
 from app.repositories.usage_stats_repo import UsageStatsRepository
 from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationRequest, CaptchaVerificationResponse
 from app.models.captcha_log import CaptchaResult
+from app.services import behavior_service
 
 
 class CaptchaService:
@@ -37,7 +38,7 @@ class CaptchaService:
 
         Args:
             clientToken (str): 검증할 캡챠 세션의 고유 클라이언트 토큰입니다.
-            request (CaptchaVerificationRequest): 사용자가 제출한 답변을 담은 요청 모델입니다.
+            request (CaptchaVerificationRequest): 사용자가 제출한 답변과 행동 데이터를 담은 요청 모델입니다.
             ipAddress (Optional[str]): 사용자 요청의 IP 주소입니다.
             userAgent (Optional[str]): 사용자 요청의 User-Agent 문자열입니다.
 
@@ -46,14 +47,16 @@ class CaptchaService:
         """
         # 순환 참조를 방지하기 위해 함수 내에서 task를 임포트합니다.
         from app.tasks.captcha_tasks import verifyCaptchaTask
-        
+
         # .delay()를 사용하여 작업을 메시지 큐에 전달합니다.
         # 인자들은 Celery에 의해 직렬화되어 워커 프로세스로 전달됩니다.
         task = verifyCaptchaTask.delay(
             clientToken=clientToken,
             answer=request.answer,
             ipAddress=ipAddress,
-            userAgent=userAgent
+            userAgent=userAgent,
+            meta=request.meta,
+            events=request.events
         )
         return task.id
 
@@ -153,7 +156,13 @@ class CaptchaService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-    def verifyCaptchaAnswer(self, clientToken: str, request: CaptchaVerificationRequest, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaVerificationResponse:
+    def verifyCaptchaAnswer(
+        self,
+        clientToken: str,
+        request: CaptchaVerificationRequest,
+        ipAddress: Optional[str],
+        userAgent: Optional[str]
+    ) -> CaptchaVerificationResponse:
         """
         제출된 캡챠 답변을 검증하고, 결과를 기록하는 비즈니스 로직입니다.
         이 함수는 동기적으로 실행되며, 비동기 작업인 `verifyCaptchaTask` 내부에서 호출됩니다.
@@ -169,47 +178,47 @@ class CaptchaService:
         """
         try:
             # 1. 클라이언트 토큰을 사용하여 캡챠 세션 정보를 데이터베이스에서 조회합니다.
-            # 동시성 문제를 방지하기 위해 레코드에 비관적 잠금(for_update=True)을 설정합니다.
             session = self.captchaRepo.getCaptchaSessionByClientToken(
                 clientToken, for_update=True)
 
-            # 2. 세션 정보가 없으면, 유효하지 않은 토큰으로 간주하고 404 Not Found 오류를 발생시킵니다.
             if not session:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="유효하지 않은 클라이언트 토큰입니다."
                 )
 
-            # 3. 해당 세션에 대한 로그가 이미 존재하는지 확인하여, 중복 검증을 방지합니다. (멱등성 보장)
             if self.captchaRepo.does_log_exist_for_session(session.id):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="이미 검증된 토큰입니다."
                 )
 
-            # 4. 세션 생성 시간에 타임존 정보가 없는 경우, 기본 타임존을 설정하여 정확한 시간 계산을 보장합니다.
             if session.createdAt.tzinfo is None:
                 session.createdAt = settings.TIMEZONE.localize(
                     session.createdAt)
 
-            # 5. 현재 시간과 세션 생성 시간의 차이를 계산하여 경과 시간(latency)을 구합니다.
             latency = datetime.now(settings.TIMEZONE) - session.createdAt
-            # 6. 경과 시간이 설정된 타임아웃(기본 3분)을 초과한 경우, 타임아웃으로 처리합니다.
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
-                # 타임아웃 결과를 로그에 기록합니다.
                 self.captchaRepo.createCaptchaLog(
                     session=session,
                     result=CaptchaResult.TIMEOUT,
                     latency_ms=int(latency.total_seconds() * 1000)
                 )
-                # API 키 사용 통계에 타임아웃 결과를 업데이트합니다.
                 usageStatsRepo = UsageStatsRepository(self.db)
                 usageStatsRepo.incrementVerificationResult(
                     session.keyId, CaptchaResult.TIMEOUT.value, int(latency.total_seconds() * 1000))
-
-                # 모든 변경사항을 데이터베이스에 커밋하고, 타임아웃 응답을 반환합니다.
                 self.db.commit()
                 return CaptchaVerificationResponse(result="timeout", message="캡챠 세션이 만료되었습니다.")
+
+            # 행동 데이터 분석
+            confidence = None
+            verdict = None
+            if request.meta and request.events:
+                behavior_result = behavior_service.run_behavior_verification(
+                    request.meta, request.events)
+                if behavior_result and behavior_result.get("ok"):
+                    confidence = behavior_result.get("bot_prob")
+                    verdict = behavior_result.get("verdict")
 
             # 7. 세션에 연결된 캡챠 문제의 정답을 가져옵니다.
             correct_answer = session.captchaProblem.answer
@@ -236,14 +245,12 @@ class CaptchaService:
             self.db.commit()
 
             # 13. 최종 검증 결과를 클라이언트에게 반환합니다.
-            return CaptchaVerificationResponse(result=result.value, message=message)
+            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict=verdict)
 
         except HTTPException as e:
-            # 14. 예상된 HTTP 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 해당 예외를 다시 발생시킵니다.
             self.db.rollback()
             raise e
         except Exception as e:
-            # 15. 그 외 예상치 못한 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 500 Internal Server Error를 발생시킵니다.
             self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

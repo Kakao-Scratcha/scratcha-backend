@@ -51,7 +51,7 @@ services:
             - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
             - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
         ports:
-            - "5672:5672"  # AMQP port
+            - "5672:5672" # AMQP port
             - "15672:15672" # Management UI port
         volumes:
             - rabbitmq_data:/var/lib/rabbitmq/
@@ -62,7 +62,7 @@ services:
             retries: 3
 
     # Celery 워커 서비스
-    worker:
+    celery_worker:
         build:
             context: .
             dockerfile: Dockerfile
