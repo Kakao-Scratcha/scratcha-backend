@@ -1,6 +1,6 @@
 # backend/models/captcha_log.py
 
-from sqlalchemy import Column, Enum, Integer, String, TEXT, DateTime, ForeignKey, func
+from sqlalchemy import Column, Enum, Integer, String, TEXT, DateTime, ForeignKey, func, Float, Boolean
 from sqlalchemy.orm import relationship
 import enum
 from datetime import datetime
@@ -50,6 +50,24 @@ class CaptchaLog(Base):
         Integer,
         nullable=False,
         comment="캡챠 문제가 해결되기까지 걸린 시간(밀리초)"
+    )
+    is_correct = Column(
+        "is_correct",
+        Boolean,
+        nullable=True,
+        comment="캡챠 문제 정답 여부 (True: 정답, False: 오답)"
+    )
+    ml_confidence = Column(
+        "ml_confidence",
+        Float,
+        nullable=True,
+        comment="머신러닝 모델의 신뢰도 (0.0 ~ 1.0)"
+    )
+    ml_is_bot = Column(
+        "ml_is_bot",
+        Boolean,
+        nullable=True,
+        comment="머신러닝 모델의 봇 판정 (True: 봇, False: 사람)"
     )
     created_at = Column(
         "created_at",

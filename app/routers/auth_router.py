@@ -20,19 +20,6 @@ router = APIRouter(
 )
 
 
-def getAuthService(db: Session = Depends(get_db)) -> AuthService:
-    """
-    FastAPI 의존성 주입을 통해 AuthService 인스턴스를 생성하고 반환합니다.
-
-    Args:
-        db (Session, optional): `get_db` 의존성에서 제공하는 데이터베이스 세션.
-
-    Returns:
-        AuthService: AuthService의 인스턴스.
-    """
-    return AuthService(db)
-
-
 @router.post(
     "/login",
     response_model=Token,
@@ -41,7 +28,7 @@ def getAuthService(db: Session = Depends(get_db)) -> AuthService:
 )
 async def loginForAccessToken(
     formData: UserLogin,
-    authService: AuthService = Depends(getAuthService),
+    db: Session = Depends(get_db), # Direct DB session injection
 ):
     """
     사용자 로그인을 처리하고 액세스 토큰을 발급합니다.
@@ -53,26 +40,28 @@ async def loginForAccessToken(
     Returns:
         Token: 발급된 JWT 액세스 토큰 정보.
     """
+    # 1. AuthService 인스턴스 생성
+    authService = AuthService(db)
     try:
-        # 1. 인증 서비스를 통해 사용자 자격 증명을 검증합니다.
+        # 2. 인증 서비스를 통해 사용자 자격 증명을 검증합니다.
         user = authService.authenticateUser(formData.email, formData.password)
     except UserNotFoundException:
-        # 2. 사용자를 찾을 수 없는 경우, 401 Unauthorized 오류를 발생시킵니다.
+        # 3. 사용자를 찾을 수 없는 경우, 401 Unauthorized 오류를 발생시킵니다.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="존재하지 않는 사용자입니다.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     except InvalidPasswordException:
-        # 3. 비밀번호가 일치하지 않는 경우, 401 Unauthorized 오류를 발생시킵니다.
+        # 4. 비밀번호가 일치하지 않는 경우, 401 Unauthorized 오류를 발생시킵니다.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="비밀번호가 올바르지 않습니다.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 4. 인증에 성공하면, 해당 사용자를 위한 액세스 토큰을 생성합니다.
+    # 5. 인증에 성공하면, 해당 사용자를 위한 액세스 토큰을 생성합니다.
     token = authService.createAccessTokenForUser(user)
 
-    # 5. 생성된 토큰을 클라이언트에게 반환합니다.
+    # 6. 생성된 토큰을 클라이언트에게 반환합니다.
     return token

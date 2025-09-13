@@ -229,3 +229,5 @@ pyrightconfig.json
 nginx/
 pg/
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,python
+.gemini/
+gha-creds-*.json

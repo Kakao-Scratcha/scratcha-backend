@@ -53,13 +53,19 @@ class ApplicationUpdate(BaseModel):
 
 class ApplicationResponse(BaseModel):
     id: int = Field(..., description="애플리케이션의 고유 식별자", example=1)
-    userId: int = Field(..., description="애플리케이션을 소유한 사용자의 고유 식별자", example=101)
+    userId: int = Field(...,
+                        description="애플리케이션을 소유한 사용자의 고유 식별자", example=101)
     appName: str = Field(..., description="애플리케이션의 이름", example="내 첫번째 애플리케이션")
-    description: Optional[str] = Field(None, description="애플리케이션에 대한 상세 설명", example="사용자 인증을 위한 스크래치 기반 캡챠 서비스")
-    key: Optional[ApiKeyResponse] = Field(None, description="애플리케이션에 발급된 API 키 정보")
-    createdAt: datetime = Field(..., description="애플리케이션 생성 일시", example="2024-01-01T12:00:00")
-    updatedAt: datetime = Field(..., description="애플리케이션 마지막 수정 일시", example="2024-01-01T12:00:00")
-    deletedAt: Optional[datetime] = Field(None, description="애플리케이션 삭제 일시", example=None)
+    description: Optional[str] = Field(
+        None, description="애플리케이션에 대한 상세 설명", example="사용자 인증을 위한 스크래치 기반 캡챠 서비스")
+    key: Optional[ApiKeyResponse] = Field(
+        None, description="애플리케이션에 발급된 API 키 정보")
+    createdAt: datetime = Field(..., description="애플리케이션 생성 일시",
+                                example="2024-01-01T12:00:00")
+    updatedAt: datetime = Field(..., description="애플리케이션 마지막 수정 일시",
+                                example="2024-01-01T12:00:00")
+    deletedAt: Optional[datetime] = Field(
+        None, description="애플리케이션 삭제 일시", example=None)
 
     class Config:
         from_attributes = True  # Pydantic v2: orm_mode 대신 from_attributes 사용

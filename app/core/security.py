@@ -11,7 +11,7 @@ from app.models.api_key import ApiKey
 from app.models.user import User, UserRole
 from app.repositories.api_key_repo import ApiKeyRepository
 from app.repositories.user_repo import UserRepository
-from app.core.config import settings # settings 객체 임포트
+from app.core.config import settings  # settings 객체 임포트
 
 
 # 비밀번호 해싱 및 검증을 위한 bcrypt 컨텍스트
@@ -48,7 +48,8 @@ def createAccessToken(data: dict, expires_delta: timedelta | None = None) -> str
     toEncode.update({"exp": expire})
 
     # 4. 최종 페이로드를 사용하여 JWT를 인코딩합니다.
-    encodedJwt = jwt.encode(toEncode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    encodedJwt = jwt.encode(toEncode, settings.SECRET_KEY,
+                            algorithm=settings.ALGORITHM)
 
     # 5. 인코딩된 JWT 문자열을 반환합니다.
     return encodedJwt
@@ -67,7 +68,8 @@ def decodeJwtToken(token: str) -> dict:
     try:
         # 1. JWT 라이브러리를 사용하여 토큰을 디코딩하고 검증합니다.
         # SECRET_KEY와 ALGORITHM을 사용하여 서명을 확인하고, 만료 시간을 자동으로 체크합니다.
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY,
+                             algorithms=[settings.ALGORITHM])
         # 2. 검증에 성공하면 페이로드를 반환합니다.
         return payload
     except JWTError:
@@ -79,21 +81,21 @@ def decodeJwtToken(token: str) -> dict:
         )
 
 
-# 인증만 필요한 라우터에서 사용: JWT payload(dict) 반환
-async def getJwtPayload(token_object: HTTPBearer = Depends(httpBearerScheme)) -> dict:
-    """
-    FastAPI 의존성 주입을 통해 HTTP 'Authorization' 헤더에서 Bearer 토큰을 추출하고,
-    디코딩하여 페이로드(payload)를 반환합니다.
-
-    Args:
-        token_object (HTTPBearer, optional): `Depends(httpBearerScheme)`를 통해 주입되는 토큰 객체.
-
-    Returns:
-        dict: 검증된 JWT의 페이로드(payload).
-    """
-    # 1. HTTPBearer 스키마를 통해 'Authorization: Bearer <token>' 헤더에서 토큰 자격증명(credentials)을 추출합니다.
-    # 2. 추출된 토큰 문자열을 `decodeJwtToken` 함수에 전달하여 페이로드를 얻고 반환합니다.
-    return decodeJwtToken(token_object.credentials)
+# JWT payload(dict)를 직접 반환하는 대신, getAuthenticatedUser에서 토큰을 직접 받도록 변경
+# async def getJwtPayload(token_object: HTTPBearer = Depends(httpBearerScheme)) -> dict:
+#     """
+#     FastAPI 의존성 주입을 통해 HTTP 'Authorization' 헤더에서 Bearer 토큰을 추출하고,
+#     디코딩하여 페이로드(payload)를 반환합니다.
+#
+#     Args:
+#         token_object (HTTPBearer, optional): `Depends(httpBearerScheme)`를 통해 주입되는 토큰 객체.
+#
+#     Returns:
+#         dict: 검증된 JWT의 페이로드(payload).
+#     """
+#     # 1. HTTPBearer 스키마를 통해 'Authorization: Bearer <token>' 헤더에서 토큰 자격증명(credentials)을 추출합니다.
+#     # 2. 추출된 토큰 문자열을 `decodeJwtToken` 함수에 전달하여 페이로드를 얻고 반환합니다.
+#     return decodeJwtToken(token_object.credentials)
 
 
 def getEmailFromPayload(payload: dict) -> str:
@@ -120,31 +122,35 @@ def getEmailFromPayload(payload: dict) -> str:
 
 
 # User 객체가 필요한 라우터에서 사용: JWT 토큰에서 사용자 이메일을 추출하고 DB에서 User 객체를 반환합니다.
-def getCurrentUser(
-    payload: dict = Depends(getJwtPayload),
+async def getAuthenticatedUser(
+    token_object: HTTPBearer = Depends(httpBearerScheme), # HTTPBearer를 통해 토큰 객체 주입
     db: Session = Depends(get_db)
 ) -> User:
     """
     FastAPI 의존성 주입을 통해 현재 인증된 사용자의 `User` 모델 객체를 반환합니다.
 
     Args:
-        payload (dict, optional): `getJwtPayload` 의존성을 통해 얻는 JWT 페이로드.
+        token_object (HTTPBearer): `HTTPBearer` 의존성을 통해 얻는 토큰 객체.
         db (Session, optional): `get_db` 의존성을 통해 얻는 데이터베이스 세션.
 
     Returns:
         User: 인증된 사용자의 DB 모델 객체.
     """
-    # 1. `getJwtPayload` 의존성으로부터 페이로드를 받아 `getEmailFromPayload`를 호출하여 이메일을 추출합니다.
+    # 1. 토큰 객체에서 자격 증명(credentials) 문자열을 추출합니다.
+    token = token_object.credentials
+    # 2. JWT 토큰을 디코딩하여 페이로드를 얻습니다.
+    payload = decodeJwtToken(token)
+    # 3. 페이로드에서 사용자 이메일을 추출합니다.
     email = getEmailFromPayload(payload)
-    # 2. 데이터베이스 세션을 사용하여 사용자 리포지토리를 생성합니다.
+    # 4. 데이터베이스 세션을 사용하여 사용자 리포지토리를 생성합니다.
     user_repo = UserRepository(db)
-    # 3. 추출된 이메일로 데이터베이스에서 사용자를 조회합니다.
+    # 5. 추출된 이메일로 데이터베이스에서 사용자를 조회합니다.
     user = user_repo.getUserByEmail(email)
-    # 4. 사용자를 찾을 수 없으면 오류를 발생시킵니다。
+    # 6. 사용자를 찾을 수 없으면 오류를 발생시킵니다。
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
-    # 5. 조회된 사용자 객체를 반환합니다.
+    # 7. 조회된 사용자 객체를 반환합니다.
     return user
 
 
@@ -161,8 +167,6 @@ def verifyPassword(plainPassword: str, hashedPassword: str) -> bool:
     """
     # 1. passlib의 CryptContext를 사용하여 평문 비밀번호와 해시를 안전하게 비교합니다.
     return pwdContext.verify(plainPassword, hashedPassword)
-
-
 def getPasswordHash(password: str) -> str:
     """
     평문 비밀번호를 bcrypt 알고리즘을 사용하여 해시합니다.
@@ -208,22 +212,22 @@ async def getValidApiKey(
     return apiKey
 
 
-def getCurrentAdminUser(current_user: User = Depends(getCurrentUser)) -> User:
+def getCurrentAdminUser(authenticated_user: User = Depends(getAuthenticatedUser)) -> User:
     """
     현재 인증된 사용자가 관리자(ADMIN) 권한을 가지고 있는지 확인합니다.
 
     Args:
-        current_user (User, optional): `getCurrentUser` 의존성을 통해 얻는 현재 사용자 객체.
+        authenticated_user (User, optional): `getAuthenticatedUser` 의존성을 통해 얻는 현재 사용자 객체.
 
     Returns:
         User: 관리자 권한이 확인된 사용자 객체.
     """
-    # 1. `getCurrentUser`를 통해 얻은 사용자 객체의 역할(role)을 확인합니다.
-    if current_user.role != UserRole.ADMIN:
+    # 1. `getAuthenticatedUser`를 통해 얻은 사용자 객체의 역할(role)을 확인합니다.
+    if authenticated_user.role != UserRole.ADMIN:
         # 2. 역할이 ADMIN이 아니면, 권한 부족 오류를 발생시킵니다.
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="관리자 권한이 필요합니다."
         )
     # 3. 관리자임이 확인되면, 해당 사용자 객체를 반환합니다.
-    return current_user
+    return authenticated_user

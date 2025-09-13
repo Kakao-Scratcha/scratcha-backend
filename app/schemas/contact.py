@@ -7,9 +7,12 @@ import re
 # 문의 베이스 스키마
 class ContactBase(BaseModel):
     name: str = Field(..., max_length=50, description="작성자 이름", example="홍길동")
-    email: EmailStr = Field(..., max_length=100, description="작성자 이메일", example="user@example.com")
-    title: str = Field(..., max_length=200, description="문의 제목", example="서비스 관련 문의입니다.")
-    content: str = Field(..., max_length=5000, description="문의 내용", example="안녕하세요, ...")
+    email: EmailStr = Field(..., max_length=100,
+                            description="작성자 이메일", example="user@example.com")
+    title: str = Field(..., max_length=200,
+                       description="문의 제목", example="서비스 관련 문의입니다.")
+    content: str = Field(..., max_length=5000,
+                         description="문의 내용", example="안녕하세요, ...")
 
     @field_validator('name')
     def validate_name(cls, v):
@@ -56,6 +59,8 @@ class ContactBase(BaseModel):
         return v
 
 # 문의 생성 스키마 (API 요청 시 사용)
+
+
 class ContactCreate(ContactBase):
     pass
 
@@ -63,7 +68,8 @@ class ContactCreate(ContactBase):
 # 문의 응답 스키마 (API 응답 시 사용)
 class ContactResponse(ContactBase):
     id: int = Field(..., description="문의 고유 ID", example=1)
-    createdAt: datetime = Field(..., description="문의 생성 일시", example="2024-01-01T12:00:00")
+    createdAt: datetime = Field(..., description="문의 생성 일시",
+                                example="2024-01-01T12:00:00")
 
     class Config:
         from_attributes = True  # SQLAlchemy 모델을 Pydantic 모델로 변환

@@ -7,7 +7,7 @@ from typing import List
 from db.session import get_db
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 from app.services.user_service import UserService
-from app.core.security import getCurrentUser
+from app.core.security import getAuthenticatedUser # Updated import
 from app.models.user import User
 
 router = APIRouter(
@@ -15,19 +15,6 @@ router = APIRouter(
     tags=["Users"],
     responses={404: {"description": "Not found"}},
 )
-
-
-def getUserService(db: Session = Depends(get_db)) -> UserService:
-    """
-    FastAPI 의존성 주입을 통해 UserService 인스턴스를 생성하고 반환합니다.
-
-    Args:
-        db (Session, optional): `get_db` 의존성에서 제공하는 데이터베이스 세션.
-
-    Returns:
-        UserService: UserService의 인스턴스.
-    """
-    return UserService(db)
 
 
 @router.post(
@@ -39,7 +26,7 @@ def getUserService(db: Session = Depends(get_db)) -> UserService:
 )
 def signupUser(
     userCreate: UserCreate,
-    userService: UserService = Depends(getUserService)
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     새로운 사용자 계정을 생성합니다.
@@ -51,17 +38,19 @@ def signupUser(
     Returns:
         UserResponse: 생성된 사용자의 상세 정보.
     """
-    # 1. 사용자 서비스의 계정 생성 메서드를 호출합니다.
+    # 1. UserService 인스턴스 생성
+    userService = UserService(db)
+    # 2. 사용자 서비스의 계정 생성 메서드를 호출합니다.
     newUser = userService.createUser(userCreate)
 
-    # 2. 사용자 생성에 실패(예: 이미 존재하는 이메일)한 경우, 409 Conflict 오류를 발생시킵니다.
+    # 3. 사용자 생성에 실패(예: 이미 존재하는 이메일)한 경우, 409 Conflict 오류를 발생시킵니다.
     if newUser is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 존재하는 이메일입니다."
         )
 
-    # 3. 생성된 사용자 정보를 반환합니다.
+    # 4. 생성된 사용자 정보를 반환합니다。
     return newUser
 
 
@@ -73,7 +62,7 @@ def signupUser(
     description="현재 인증된(로그인된) 사용자의 상세 정보를 조회합니다."
 )
 def getUser(
-    currentUser: User = Depends(getCurrentUser),
+    authenticatedUser: User = Depends(getAuthenticatedUser),
 ):
     """
     현재 인증된 사용자의 정보를 조회합니다.
@@ -84,8 +73,8 @@ def getUser(
     Returns:
         UserResponse: 현재 사용자의 상세 정보.
     """
-    # 1. `getCurrentUser` 의존성을 통해 이미 인증된 사용자 객체가 주입되므로, 해당 객체를 바로 반환합니다.
-    return currentUser
+    # 1. `getAuthenticatedUser` 의존성을 통해 이미 인증된 사용자 객체가 주입되므로, 해당 객체를 바로 반환합니다.
+    return authenticatedUser
 
 
 @router.patch(
@@ -97,8 +86,8 @@ def getUser(
 )
 def updateUser(
     userUpdate: UserUpdate,
-    currentUser: User = Depends(getCurrentUser),
-    userService: UserService = Depends(getUserService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 
 ):
     """
@@ -112,9 +101,11 @@ def updateUser(
     Returns:
         UserResponse: 업데이트된 사용자의 상세 정보.
     """
-    # 1. 사용자 서비스의 정보 업데이트 메서드를 호출합니다.
-    updatedUser = userService.updateUser(currentUser.id, userUpdate)
-    # 2. 업데이트된 사용자 정보를 반환합니다.
+    # 1. UserService 인스턴스 생성
+    userService = UserService(db)
+    # 2. 사용자 서비스의 정보 업데이트 메서드를 호출합니다.
+    updatedUser = userService.updateUser(authenticatedUser.id, userUpdate)
+    # 3. 업데이트된 사용자 정보를 반환합니다.
     return updatedUser
 
 
@@ -126,8 +117,8 @@ def updateUser(
     description="현재 로그인된 사용자 계정을 소프트 삭제(비활성화) 처리합니다."
 )
 def deleteUser(
-    currentUser: User = Depends(getCurrentUser),
-    userService: UserService = Depends(getUserService)
+    authenticatedUser: User = Depends(getAuthenticatedUser),
+    db: Session = Depends(get_db) # Direct DB session injection
 ):
     """
     현재 인증된 사용자 계정을 소프트 삭제합니다.
@@ -139,17 +130,19 @@ def deleteUser(
     Returns:
         UserResponse: 소프트 삭제 처리된 사용자의 상세 정보.
     """
-    # 1. 사용자 서비스의 계정 삭제 메서드를 호출합니다.
-    deletedUser = userService.deleteUser(currentUser.id)
+    # 1. UserService 인스턴스 생성
+    userService = UserService(db)
+    # 2. 사용자 서비스의 계정 삭제 메서드를 호출합니다.
+    deletedUser = userService.deleteUser(authenticatedUser.id)
 
-    # 2. 삭제할 사용자를 찾을 수 없는 경우 (예: 이미 삭제되었거나 존재하지 않는 경우), 404 Not Found 오류를 발생시킵니다.
+    # 3. 삭제할 사용자를 찾을 수 없는 경우 (예: 이미 삭제되었거나 존재하지 않는 경우), 404 Not Found 오류를 발생시킵니다.
     if not deletedUser:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="사용자를 찾을 수 없습니다."
         )
 
-    # 3. 삭제 처리된 사용자 정보를 반환합니다.
+    # 4. 삭제 처리된 사용자 정보를 반환합니다.
     return deletedUser
 
 
@@ -163,7 +156,7 @@ def deleteUser(
 # def updateUserPlan(
 #     userId: int,
 #     planUpdate: UserPlanUpdate,
-#     currentUser: User = Depends(getCurrentUser),
+#     currentUser: User = Depends(getAuthenticatedUser),
 #     userService: UserService = Depends(getUserService)
 # ):
 #     """
@@ -172,13 +165,12 @@ def deleteUser(
 #     Args:
 #         userId (int): 플랜을 업데이트할 사용자의 ID.
 #         planUpdate (UserPlanUpdate): 업데이트할 구독 플랜 정보 (스키마).
-#         currentUser (User): `getCurrentUser` 의존성으로 주입된 현재 인증된 사용자 객체.
-#         userService: UserService = Depends(getUserService)
+#         currentUser (User): `getAuthenticatedUser` 의존성으로 주입된 현재 인증된 사용자 객체.
 
 #     Returns:
 #         UserResponse: 플랜이 업데이트된 사용자의 상세 정보.
 #     """
 #     # 1. 사용자 서비스의 구독 플랜 업데이트 메서드를 호출합니다.
-#     updatedUser = userService.updateUserPlan(userId, planUpdate, currentUser)
+#     updatedUser = userService.updateUserPlan(userId, planUpdate, authenticatedUser)
 #     # 2. 업데이트된 사용자 정보를 반환합니다.
 #     return updatedUser

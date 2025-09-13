@@ -3,7 +3,6 @@ import logging.config
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -14,24 +13,22 @@ from app.routers import payment_router, users_router, auth_router, application_r
 from app.admin.admin import setup_admin
 from app.admin.auth import AdminAuth
 from app.core.config import settings
-from app.tasks.scheduler import start_scheduler, shutdown_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup event
-    print("이벤트 스케줄러 시작...")
+    print("로깅 설정 적용...")
     logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
-    start_scheduler()
     yield
     # Shutdown event
-    print("이벤트 스케줄러 종료...")
-    shutdown_scheduler()
+    print("데이터베이스 연결 풀 해제...")
+    engine.dispose()
+    print("애플리케이션 종료.")
 
 app = FastAPI(
     title="Dashboard API",
-    description="scratcha API 서버",
-    version="0.1.0",
+    description="scratCHA API 서버",
     lifespan=lifespan  # Add lifespan to FastAPI app
 )
 
@@ -92,15 +89,15 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # 모든 HTTP 메소드 허용
-    allow_headers=["*"],  # 모든 헤더 허용
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # SessionMiddleware를 추가하여 request.session을 사용할 수 있도록 합니다.
 # SQLAdmin의 인증 백엔드(AdminAuth)가 세션에 접근하기 위해 필요합니다.
 # secret_key는 세션 데이터를 암호화하는 데 사용됩니다. 실제 운영 환경에서는 환경 변수 등으로 관리해야 합니다.
 app.add_middleware(SessionMiddleware,
-                   secret_key=settings.SESSION_SECRET_KEY)  # 하드코딩된 시크릿 키
+                   secret_key=settings.SESSION_SECRET_KEY)
 
 # SQLAdmin 관리자 인터페이스를 설정합니다.
 # setup_admin 함수를 통해 모든 ModelView가 등록됩니다.
@@ -112,23 +109,15 @@ admin.authentication_backend = authentication_backend
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Dashboard API! For user management and billing."}
+    return {"message": "scratCHA API 서버"}
 
 
 # 라우터 등록
-app.include_router(users_router.router,
-                   prefix="/api/dashboard")        # 유저관리 라우터
-app.include_router(auth_router.router,
-                   prefix="/api/dashboard")         # 로그인(인증) 라우터
-app.include_router(application_router.router,
-                   prefix="/api/dashboard")  # 애플리케이션 라우터
-app.include_router(api_key_router.router,
-                   prefix="/api/dashboard")      # API 키 라우터
-app.include_router(usage_stats_router.router,
-                   prefix="/api/dashboard")  # 사용량 라우터
-app.include_router(captcha_router.router,
-                   prefix="/api")                # 캡챠 라우터
-app.include_router(payment_router.router,
-                   prefix="/api")                # 결제 라우터
-app.include_router(contact_router.router,
-                   prefix="/api")                # 문의 라우터
+app.include_router(users_router.router, prefix="/api/dashboard")
+app.include_router(auth_router.router, prefix="/api/dashboard")
+app.include_router(application_router.router, prefix="/api/dashboard")
+app.include_router(api_key_router.router, prefix="/api/dashboard")
+app.include_router(usage_stats_router.router, prefix="/api/dashboard")
+app.include_router(captcha_router.router, prefix="/api")
+app.include_router(payment_router.router, prefix="/api")
+app.include_router(contact_router.router, prefix="/api")

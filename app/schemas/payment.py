@@ -6,27 +6,27 @@ from datetime import datetime
 
 class PaymentBase(BaseModel):
     """결제 정보의 기본 필드를 정의하는 스키마"""
-    orderId: str
-    paymentKey: str
-    status: str
-    method: Optional[str] = None
-    orderName: Optional[str] = None
-    amount: int
-    currency: Optional[str] = None
-    approvedAt: Optional[datetime] = None
-    canceledAt: Optional[datetime] = None
+    orderId: str = Field(..., description="주문 ID", example="order-123")
+    paymentKey: str = Field(..., description="결제 키", example="paykey-456")
+    status: str = Field(..., description="결제 상태", example="DONE")
+    method: Optional[str] = Field(None, description="결제 수단", example="카드")
+    orderName: Optional[str] = Field(None, description="주문 이름", example="캡챠 서비스 이용권")
+    amount: int = Field(..., description="결제 금액", example=10000)
+    currency: Optional[str] = Field(None, description="통화", example="KRW")
+    approvedAt: Optional[datetime] = Field(None, description="승인 일시", example="2024-01-01T12:00:00")
+    canceledAt: Optional[datetime] = Field(None, description="취소 일시", example=None)
 
 
 class PaymentCreate(PaymentBase):
     """새로운 결제 정보를 생성할 때 사용하는 스키마"""
-    userId: int
+    userId: int = Field(..., description="사용자 ID", example=1)
 
 
 class Payment(PaymentBase):
     """API 응답으로 사용될 결제 정보 스키마"""
-    id: int
-    userId: int
-    createdAt: datetime
+    id: int = Field(..., description="결제 ID", example=1)
+    userId: int = Field(..., description="사용자 ID", example=1)
+    createdAt: datetime = Field(..., description="생성 일시", example="2024-01-01T12:00:00")
 
     class Config:
         from_attributes = True
@@ -58,26 +58,37 @@ class PaymentHistoryResponse(BaseModel):
 
 class PaymentConfirmRequest(BaseModel):
     """결제 승인 요청 시 클라이언트로부터 받는 데이터 모델"""
-    paymentKey: str
-    orderId: str
-    amount: int
+    paymentKey: str = Field(..., description="결제 키", example="paykey-789")
+    orderId: str = Field(..., description="주문 ID", example="order-456")
+    amount: int = Field(..., description="결제 금액", example=10000)
 
 
 class RefundReceiveAccount(BaseModel):
     """결제 취소 후 환불받을 계좌 정보 스키마"""
-    bank: str
-    accountNumber: str
-    holderName: str
+    bank: str = Field(..., description="은행 이름", example="국민은행")
+    accountNumber: str = Field(..., description="계좌 번호", example="1234567890")
+    holderName: str = Field(..., description="예금주", example="홍길동")
 
 
 class PaymentCancelRequest(BaseModel):
     """결제 취소 요청 시 클라이언트로부터 받는 데이터 모델"""
-    cancelReason: str
-    cancelAmount: Optional[int] = None
-    refundReceiveAccount: Optional[RefundReceiveAccount] = None
+    cancelReason: str = Field(..., description="취소 사유", example="단순 변심")
+    cancelAmount: Optional[int] = Field(None, description="취소 금액", example=5000)
+    refundReceiveAccount: Optional[RefundReceiveAccount] = Field(None, description="환불 계좌 정보")
 
 
 class PaymentWebhookPayload(BaseModel):
     """토스페이먼츠 웹훅 이벤트 페이로드 스키마"""
-    eventType: str
-    data: dict
+    eventType: str = Field(..., description="이벤트 타입", example="PAYMENT_SUCCESS")
+    data: dict = Field(..., description="이벤트 데이터", example={
+        "mId": "test_m_id",
+        "version": "1.3",
+        "paymentKey": "test_payment_key",
+        "orderId": "test_order_id",
+        "orderName": "test_order_name",
+        "status": "DONE",
+        "requestedAt": "2024-01-01T12:00:00+09:00",
+        "approvedAt": "2024-01-01T12:00:00+09:00",
+        "totalAmount": 10000,
+        "method": "카드"
+    })

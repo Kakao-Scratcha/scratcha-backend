@@ -4,3 +4,6 @@ from .api_key import ApiKey
 from .captcha_problem import CaptchaProblem
 from .captcha_session import CaptchaSession
 from .captcha_log import CaptchaLog
+from .usage_stats import UsageStats
+from .payment import Payment
+from .contact import Contact
