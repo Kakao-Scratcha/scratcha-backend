@@ -18,5 +18,5 @@ requests
 prometheus-fastapi-instrumentator
 celery==5.4.0
 flower==2.0.1
-numpy
-torch
+numpy==2.3.2
+torch==2.8.0

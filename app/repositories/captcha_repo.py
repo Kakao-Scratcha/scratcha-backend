@@ -24,8 +24,9 @@ class CaptchaRepository:
         """
         try:
             # 1. 현재 시간을 기준으로 아직 만료되지 않은 모든 캡챠 문제를 데이터베이스에서 조회합니다.
+            # DB의 타임존 설정과 무관하게 애플리케이션의 타임존 설정을 기준으로 현재 시간을 계산합니다.
             query = self.db.query(CaptchaProblem).filter(
-                CaptchaProblem.expiresAt > func.now()
+                CaptchaProblem.expiresAt > datetime.now(settings.TIMEZONE)
             )
 
             if difficulty is not None:

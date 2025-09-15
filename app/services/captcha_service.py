@@ -126,7 +126,7 @@ class CaptchaService:
             if not s3BaseUrl:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="KS3_BASE_URL 환경 변수가 설정되지 않았습니다." # Changed from S3_BASE_URL
+                    detail="KS3_BASE_URL 환경 변수가 설정되지 않았습니다."  # Changed from S3_BASE_URL
                 )
 
             # S3 이미지 키와 S3_BASE_URL을 조합하여 클라이언트가 직접 접근할 수 있는 전체 URL을 생성합니다.
@@ -213,7 +213,7 @@ class CaptchaService:
                     session=session,
                     result=CaptchaResult.TIMEOUT,
                     latency_ms=int(latency.total_seconds() * 1000),
-                    is_correct=False, # Timeout implies incorrect
+                    is_correct=False,  # Timeout implies incorrect
                     ml_confidence=None,
                     ml_is_bot=None
                 )
@@ -259,7 +259,8 @@ class CaptchaService:
                 latency_ms=int(latency.total_seconds() * 1000),
                 is_correct=is_correct,
                 ml_confidence=confidence,
-                ml_is_bot=(verdict == "bot") if verdict else None # Convert verdict to boolean
+                # Convert verdict to boolean
+                ml_is_bot=(verdict == "bot") if verdict else None
             )
 
             # 11. API 키 사용 통계에 검증 결과를 업데이트합니다.
