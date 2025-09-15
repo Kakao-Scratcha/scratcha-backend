@@ -35,42 +35,6 @@ class CaptchaService:
         self.db = db
         self.captchaRepo = CaptchaRepository(db)
 
-    def verifyCaptchaAnswerAsync(self, clientToken: str, request: CaptchaVerificationRequest, ipAddress: Optional[str], userAgent: Optional[str]) -> str:
-        """
-        캡챠 답변 검증을 비동기 작업으로 전달합니다.
-
-        Celery 작업을 생성하고, 즉시 작업 ID를 반환하여 클라이언트가 오래 기다리지 않도록 합니다.
-        실제 검증 로직은 백그라운드의 Celery 워커에서 실행됩니다.
-
-        Args:
-            clientToken (str): 검증할 캡챠 세션의 고유 클라이언트 토큰입니다.
-            request (CaptchaVerificationRequest): 사용자가 제출한 답변과 행동 데이터를 담은 요청 모델입니다.
-            ipAddress (Optional[str]): 사용자 요청의 IP 주소입니다.
-            userAgent (Optional[str]): 클라이언트의 User-Agent 문자열입니다.
-
-        Returns:
-            str: 생성된 Celery 작업의 고유 ID.
-        """
-        # 순환 참조를 방지하기 위해 함수 내에서 task를 임포트합니다.
-        from app.tasks.captcha_tasks import verifyCaptchaTask, uploadBehaviorDataTask
-
-        # .delay()를 사용하여 작업을 메시지 큐에 전달합니다.
-        # 인자들은 Celery에 의해 직렬화되어 워커 프로세스로 전달됩니다.
-        task = verifyCaptchaTask.delay(
-            clientToken=clientToken,
-            answer=request.answer,
-            ipAddress=ipAddress,
-            userAgent=userAgent,
-            meta=request.meta,
-            events=request.events
-        )
-
-        # 행동 데이터 업로드를 비동기 작업으로 처리
-        if settings.ENABLE_KS3:
-            uploadBehaviorDataTask.delay(clientToken, request.dict())
-
-        return task.id
-
     def generateCaptchaProblem(self, apiKey: ApiKey, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaProblemResponse:
         """
         새로운 캡챠 문제를 생성하고, 사용자 토큰을 차감하며, 캡챠 세션 정보를 반환하는 비즈니스 로직입니다.
@@ -175,7 +139,6 @@ class CaptchaService:
     ) -> CaptchaVerificationResponse:
         """
         제출된 캡챠 답변을 검증하고, 결과를 기록하는 비즈니스 로직입니다.
-        이 함수는 동기적으로 실행되며, 비동기 작업인 `verifyCaptchaTask` 내부에서 호출됩니다.
 
         Args:
             clientToken (str): 클라이언트로부터 헤더로 받은 고유 토큰.
@@ -186,6 +149,9 @@ class CaptchaService:
         Returns:
             CaptchaVerificationResponse: 캡챠 검증 결과 (성공, 실패, 시간 초과).
         """
+        # 순환 참조를 방지하기 위해 함수 내에서 task를 임포트합니다.
+        from app.tasks.captcha_tasks import uploadBehaviorDataTask
+
         try:
             # 1. 클라이언트 토큰을 사용하여 캡챠 세션 정보를 데이터베이스에서 조회합니다.
             session = self.captchaRepo.getCaptchaSessionByClientToken(
@@ -202,6 +168,10 @@ class CaptchaService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="이미 검증된 토큰입니다."
                 )
+
+            # 행동 데이터 업로드를 비동기 작업으로 처리
+            if settings.ENABLE_KS3:
+                uploadBehaviorDataTask.delay(clientToken, request.dict())
 
             if session.createdAt.tzinfo is None:
                 session.createdAt = settings.TIMEZONE.localize(
