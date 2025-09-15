@@ -75,7 +75,14 @@ jobs:
                   ssh -v -o StrictHostKeyChecking=no \
                        -p $SSH_PORT \
                        "$SSH_USERNAME@$SSH_HOST" \
-                       "echo '${{ secrets.KCR_PASSWORD }}' | docker login ${{ secrets.KCR_REGISTRY_URL }} -u '${{ secrets.KCR_USER }}' --password-stdin && docker stop scratcha_server || true && docker rm scratcha_server || true && docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} && docker run -d --name scratcha_server --env-file /home/ubuntu/.env -p 8001:8001 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" 2>&1
+                       "echo '${{ secrets.KCR_PASSWORD }}' | docker login ${{ secrets.KCR_REGISTRY_URL }} -u '${{ secrets.KCR_USER }}' --password-stdin && \
+                       docker stop scratcha_server || true && docker rm scratcha_server || true && \
+                       docker stop scratcha_worker || true && docker rm scratcha_worker || true && \
+                       docker stop scratcha_celery_beat || true && docker rm scratcha_celery_beat || true && \
+                       docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} && \
+                       docker run -d --name scratcha_server --network=host --env-file /home/ubuntu/.env -p 8001:8001 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} && \
+                       docker run -d --name scratcha_worker --network=host --env-file /home/ubuntu/.env ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} celery -A app.celery_app worker -l info && \
+                       docker run -d --name scratcha_celery_beat --network=host --env-file /home/ubuntu/.env ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} celery -A app.celery_app beat -l info" 2>&1
 
     # 메인 브랜치에 푸시될 때 ArgoCD로 배포하는 새로운 잡
     deploy-to-argocd:
