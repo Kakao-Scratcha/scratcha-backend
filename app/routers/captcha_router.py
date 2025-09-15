@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, status, Request, Header, HTTPException
 from sqlalchemy.orm import Session
-from typing import Annotated
+from typing import Annotated, Optional
 
 # 프로젝트 의존성 및 모델, 서비스 임포트
 from app.core.security import getValidApiKey
@@ -18,6 +18,17 @@ router = APIRouter(
     tags=["Captcha"],
     responses={404: {"description": "Not found"}},
 )
+
+# --- 요청 크기 제한 의존성 ---
+async def check_request_size(content_length: Optional[int] = Header(None)):
+    """Content-Length 헤더를 확인하여 요청 크기를 제한하는 의존성"""
+    MAX_REQUEST_SIZE = 5 * 1024 * 1024  # 5MB
+    if content_length is not None and content_length > MAX_REQUEST_SIZE:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Request body is too large. Limit is {MAX_REQUEST_SIZE} bytes."
+        )
+# --- 의존성 끝 ---
 
 
 @router.post(
@@ -62,7 +73,8 @@ def getCaptchaProblem(
     response_model=CaptchaVerificationResponse,
     status_code=status.HTTP_200_OK,
     summary="캡챠 답변 동기 검증",
-    description="캡챠 답변을 동기적으로 검증하고 즉시 결과를 반환합니다."
+    description="캡챠 답변을 동기적으로 검증하고 즉시 결과를 반환합니다.",
+    dependencies=[Depends(check_request_size)] # 요청 크기 제한 의존성 추가
 )
 def verifyCaptchaAnswer(
     request: CaptchaVerificationRequest,

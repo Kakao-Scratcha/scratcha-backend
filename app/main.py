@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 
@@ -32,45 +31,6 @@ app = FastAPI(
     description="scratCHA API 서버",
     lifespan=lifespan  # Add lifespan to FastAPI app
 )
-
-# --- 요청 크기 제한 미들웨어 ---
-class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, max_size: int):
-        super().__init__(app)
-        self.max_size = max_size
-
-    async def dispatch(self, request: Request, call_next):
-        # content-length 헤더를 먼저 확인하여 1차적으로 제한
-        content_length = request.headers.get('content-length')
-        if content_length and int(content_length) > self.max_size:
-            return JSONResponse(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                content={'detail': f'Request body is too large. Limit is {self.max_size} bytes.'}
-            )
-
-        # 스트리밍으로 실제 요청 바디 크기를 확인하여 2차적으로 제한
-        body = b''
-        async for chunk in request.stream():
-            body += chunk
-            if len(body) > self.max_size:
-                return JSONResponse(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    content={'detail': f'Request body is too large. Limit is {self.max_size} bytes.'}
-                )
-        
-        # 다음 미들웨어 또는 엔드포인트가 요청 바디를 읽을 수 있도록 receive 채널을 다시 만듦
-        async def receive():
-            return {'type': 'http.request', 'body': body, 'more_body': False}
-
-        new_request = Request(request.scope, receive=receive)
-        
-        response = await call_next(new_request)
-        return response
-
-# 5MB (5 * 1024 * 1024) 크기 제한 미들웨어 추가
-app.add_middleware(RequestSizeLimitMiddleware, max_size=5242880)
-# --- 미들웨어 끝 ---
-
 
 # Prometheus 메트릭을 설정합니다.
 Instrumentator().instrument(app).expose(app)
@@ -139,7 +99,7 @@ app.add_middleware(
 app.add_middleware(SessionMiddleware,
                    secret_key=settings.SESSION_SECRET_KEY)
 
-# SQLAdmin 관리자 인터페이스를 설정합니다.
+# SQLAdmin 관리자 인터페이스을 설정합니다.
 # setup_admin 함수를 통해 모든 ModelView가 등록됩니다.
 authentication_backend = AdminAuth(
     secret_key=settings.SESSION_SECRET_KEY)
