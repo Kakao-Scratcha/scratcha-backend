@@ -231,7 +231,10 @@ def cleanupExpiredSessionsTask():
                 captchaRepo.createCaptchaLog(
                     session=session,
                     result=CaptchaResult.TIMEOUT,
-                    latency_ms=int(latency.total_seconds() * 1000)
+                    latency_ms=int(latency.total_seconds() * 1000),
+                    is_correct=False,
+                    ml_confidence=None,
+                    ml_is_bot=None
                 )
                 # 타임아웃 발생에 대한 사용량 통계를 업데이트합니다.
                 usageStatsRepo.incrementVerificationResult(
