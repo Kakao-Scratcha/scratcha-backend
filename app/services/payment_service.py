@@ -33,10 +33,10 @@ class PaymentService:
     def getUserPaymentHistory(self, currentUser: User, skip: int, limit: int) -> PaymentHistoryResponse:
         try:
             # 1.1. 현재 사용자의 총 결제 건수 조회
-            total = self.paymentRepo.get_payments_count_by_user_id(userId=currentUser.id)
+            total = self.paymentRepo.get_payments_count_by_user_id(user_id=currentUser.id)
             # 1.2. 현재 사용자의 결제 내역 조회 (페이지네이션 적용)
             payments = self.paymentRepo.get_payments_by_user_id(
-                userId=currentUser.id, skip=skip, limit=limit
+                user_id=currentUser.id, skip=skip, limit=limit
             )
 
             # 1.3. 조회된 Payment 모델을 PaymentHistoryItem 스키마로 변환
