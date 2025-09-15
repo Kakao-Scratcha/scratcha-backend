@@ -25,9 +25,15 @@ jobs:
               uses: actions/checkout@v4
 
             - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+              uses: docker/build-push-action@v4
               with:
-                  driver: docker-container
+                  context: .
+                  push: true
+                  tags: |
+                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
 
             - name: Login to Kakao Cloud Registry
               # 카카오클라우드 레지스트리에 로그인합니다.
@@ -118,11 +124,13 @@ jobs:
                   token: ${{ secrets.REPO_TOKEN }}
                   path: ${{ secrets.REPO_PATH }}
 
-            - name: Update values.yaml
+            - name: Update values.yaml files
               run: |
-                  # values.yaml 파일 내에서 'tag:'로 시작하는 모든 라인을 찾아 새로운 이미지 태그로 교체합니다.
-                  # 이 방식은 파일 내의 모든 관련 이미지 태그를 한 번에 업데이트합니다.
-                  sed -i 's/^(\s*tag:\s*).*/\1"${{ env.IMAGE_TAG }}"/' ${{ secrets.REPO_PATH }}/${{ secrets.HELM_CHART_PATH }}/values.yaml
+                  # api-chart values.yaml 업데이트
+                  sed -i "s|tag:.*|tag: \"${{ env.IMAGE_TAG }}\"|" ${{ secrets.REPO_PATH }}/${{ secrets.HELM_CHART_PATH }}/values.yaml
+
+                  # celery-chart values.yaml 업데이트
+                  sed -i "s|tag:.*|tag: \"${{ env.IMAGE_TAG }}\"|" ${{ secrets.REPO_PATH }}/helm-chart/celery-chart/values.yaml
 
             - name: Commit & Push changes
               run: |
@@ -130,5 +138,6 @@ jobs:
                   git config user.name "github-actions"
                   git config user.email "actions@github.com"
                   git add ${{ secrets.HELM_CHART_PATH }}/values.yaml
-                  git commit -m "Update backend image tag to ${{ env.IMAGE_TAG }}"
+                  git add helm-chart/celery-chart/values.yaml
+                  git commit -m "Update backend image tag to ${{ env.IMAGE_TAG }} for both api-chart and celery-chart"
                   git push origin main
