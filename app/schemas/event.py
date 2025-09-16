@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 
 class EventData(BaseModel):
     """단일 사용자 행동 이벤트 데이터를 정의합니다."""
-    t: Optional[int] = Field(..., description="상대 타임스탬프 (밀리초)")
+    t: Optional[int] = Field(None, description="상대 타임스탬프 (밀리초)")
     type: str = Field(..., description="이벤트 타입 (예: pointerdown, moves, click)")
     x_raw: Optional[float] = Field(None, description="원본 X 좌표 (픽셀)")
     y_raw: Optional[float] = Field(None, description="원본 Y 좌표 (픽셀)")
