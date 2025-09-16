@@ -13,7 +13,7 @@ from app.schemas.captcha import CaptchaVerificationRequest
 from db.session import SessionLocal
 
 # KS3 유틸리티 함수 임포트
-from app.core.ks3 import upload_entire_session_behavior
+from app.core.ks3 import upload_entire_session_behavior, download_behavior_chunks
 
 # 로거 설정
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userA
         events (Optional[List[Dict[str, Any]]]): 사용자 행동 이벤트 데이터입니다.
 
     Returns:
-        dict: 검증 결과를 담은 딕셔너리. 성공 시 `CaptchaVerificationResponse` 스키마와 호환됩니다.
+        dict: 검증 결과를 담은 딕셔러니. 성공 시 `CaptchaVerificationResponse` 스키마와 호환됩니다.
 
     Raises:
         HTTPException: 서비스 로직 내에서 발생하는 특정 오류 상황 (예: 타임아웃, 잘못된 토큰)에 대한 예외입니다.
@@ -85,13 +85,20 @@ def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userA
 
 
 @celery_app.task
-def uploadBehaviorDataTask(clientToken: str, meta: Dict[str, Any], events: List[Dict[str, Any]]):
+def uploadBehaviorDataTask(clientToken: str):
     """
     행동 데이터를 S3/KS3에 비동기적으로 업로드하는 Celery 작업입니다.
     """
     logger.info(f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 중...")
     try:
-        upload_entire_session_behavior(meta, events, clientToken)
+        # KS3에서 행동 데이터 청크 다운로드 및 병합
+        full_events, session_meta = download_behavior_chunks(clientToken)
+
+        if not session_meta or not full_events:
+            logger.warning(f"클라이언트 토큰 {clientToken}에 대한 행동 데이터가 없거나 불완전합니다. 업로드를 건너뜁니다.")
+            return
+
+        upload_entire_session_behavior(session_meta, full_events, clientToken)
         logger.info(
             f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 성공")
     except Exception as e:

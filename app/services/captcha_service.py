@@ -190,7 +190,7 @@ class CaptchaService:
             # 행동 데이터 업로드를 비동기 작업으로 처리
             # 이 시점의 request.dict()는 events가 비어있을 수 있습니다.
             if settings.ENABLE_KS3:
-                uploadBehaviorDataTask.delay(clientToken, request.meta, request.events)
+                uploadBehaviorDataTask.delay(clientToken)
 
             if session.createdAt.tzinfo is None:
                 session.createdAt = settings.TIMEZONE.localize(

@@ -164,7 +164,7 @@ def download_behavior_chunks(client_token: str) -> Tuple[List[Dict[str, Any]], O
                 all_events.extend(chunk_data["events"])
             else:
                 logger.info(f"청크 {key}에 'events' 키가 없습니다.")
-            
+
             if session_meta is None and "meta" in chunk_data:
                 session_meta = chunk_data["meta"]
 

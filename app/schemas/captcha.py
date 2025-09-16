@@ -43,25 +43,6 @@ class CaptchaVerificationRequest(BaseModel):
         description="사용자가 선택한 정답",
         example="고양이"
     )
-    meta: Optional[Dict[str, Any]] = Field(
-        None,
-        description="행동 데이터 메타 정보",
-        example={
-            "device": "mouse",
-            "roi_map": {"canvas-container": {"left": 100, "top": 100, "w": 200, "h": 200}},
-            "ts_resolution_ms": 1,
-        }
-    )
-    events: Optional[List[Dict[str, Any]]] = Field(
-        None,
-        description="사용자 행동 이벤트 데이터",
-        example=[
-            {"type": "pointerdown", "t": 0, "x_raw": 150, "y_raw": 150},
-            {"type": "moves", "t": 0, "payload": {"base_t": 0, "dts": [
-                10, 10, 10], "xrs": [150, 160, 180], "yrs": [150, 160, 170]}},
-            {"type": "click", "t": 1000, "target_role": "answer-1"},
-        ]
-    )
 
 
 class CaptchaVerificationResponse(BaseModel):
