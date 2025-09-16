@@ -3,7 +3,8 @@
 import logging
 from app.schemas.event import EventChunk
 from app.core.ks3 import upload_behavior_chunk
-from typing import Dict, Any # Added for Dict, Any
+from typing import Dict, Any
+from fastapi import HTTPException, status # Import HTTPException and status
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,17 @@ class EventService:
             Dict[str, Any]: 청크 처리 결과 메시지.
         """
         logger.info(f"세션 {chunk.client_token}의 청크 {chunk.chunk_index}/{chunk.total_chunks} 수신. 이벤트 수: {len(chunk.events)}")
-        
-        # KS3에 청크 업로드
-        upload_behavior_chunk(chunk)
+
+        try:
+            # KS3에 청크 업로드
+            upload_behavior_chunk(chunk)
+            logger.info(f"세션 {chunk.client_token}의 청크 {chunk.chunk_index} KS3 업로드 성공.")
+        except Exception as e:
+            logger.error(f"세션 {chunk.client_token}의 청크 {chunk.chunk_index} KS3 업로드 중 오류 발생: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"이벤트 청크 처리 중 서버 오류가 발생했습니다: {e}"
+            )
 
         return {
             "status": "success",

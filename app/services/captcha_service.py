@@ -53,7 +53,7 @@ class CaptchaService:
             CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보 (클라이언트 토큰, 이미지 URL, 프롬프트, 선택지).
         """
         logger.info(
-            f"[디버그] generateCaptchaProblem 호출됨. settings.ENV: {settings.ENV}")  # 디버깅용
+            f"[디버그] 문제생성 호출")  # 디버깅용
         # 디버깅용
         logger.info(
             f"[디버그] API Key ID: {apiKey.id}, Difficulty: {apiKey.difficulty}")
@@ -134,7 +134,7 @@ class CaptchaService:
             )
             # 디버깅용
             logger.info(
-                f"[디버그] 반환될 CaptchaProblemResponse: {response_data}")
+                f"[디버그] 생성된 문제 : {response_data}")
             return response_data
 
         except HTTPException as e:
@@ -154,7 +154,7 @@ class CaptchaService:
         userAgent: Optional[str]
     ) -> CaptchaVerificationResponse:
         logger.info(
-            f"[디버그] verifyCaptchaAnswer 호출됨. clientToken: {clientToken}, request: {request.dict()}, ipAddress: {ipAddress}, userAgent: {userAgent}")
+            f"[디버그] 캡챠검증 호출됨. clientToken: {clientToken}, request: {request.dict()}, ipAddress: {ipAddress}, userAgent: {userAgent}")
         """
         제출된 캡챠 답변을 검증하고, 결과를 기록하는 비즈니스 로직입니다.
 
@@ -220,7 +220,8 @@ class CaptchaService:
             # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
             logger.info(
                 f"[디버그] KS3에서 행동 데이터 청크 다운로드 시도. clientToken: {clientToken}")
-            full_events_from_chunks, session_meta = download_behavior_chunks(clientToken)
+            full_events_from_chunks, session_meta = download_behavior_chunks(
+                clientToken)
             logger.info(
                 f"[디버그] KS3에서 다운로드된 전체 이벤트 수: {len(full_events_from_chunks)}")
 
