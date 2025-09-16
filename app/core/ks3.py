@@ -11,15 +11,17 @@ from typing import Dict, Any, List
 
 from app.core.config import settings
 from app.schemas.event import EventChunk
-from app.schemas.captcha import CaptchaVerificationRequest # CaptchaVerificationRequest 스키마 임포트
+# CaptchaVerificationRequest 스키마 임포트
+from app.schemas.captcha import CaptchaVerificationRequest
 
 logger = logging.getLogger(__name__)
+
 
 def _get_ks3_client():
     """KS3 접속을 위한 boto3 S3 클라이언트를 생성하고 반환합니다."""
     # KS3 설정이 완전히 구성되지 않았다면 클라이언트 생성 건너뛰기
     if not all([settings.KS3_BUCKET, settings.KS3_ACCESS_KEY, settings.KS3_SECRET_KEY, settings.KS3_ENDPOINT]):
-        logger.warning("KS3 설정이 완전히 구성되지 않았습니다. 업로드가 건너뜁니다.")
+        logger.info("KS3 설정이 완전히 구성되지 않았습니다. 업로드가 건너뜁니다.")
         return None
 
     config = Config(
@@ -34,6 +36,7 @@ def _get_ks3_client():
     )
     return session.client("s3", endpoint_url=settings.KS3_ENDPOINT, config=config)
 
+
 def _gzip_bytes(raw: bytes) -> bytes:
     """바이트 데이터를 gzip으로 압축합니다."""
     buf = io.BytesIO()
@@ -42,11 +45,13 @@ def _gzip_bytes(raw: bytes) -> bytes:
         gz.write(raw)
     return buf.getvalue()
 
+
 def _ungzip_bytes(gzipped_data: bytes) -> bytes:
     """gzip으로 압축된 바이트 데이터를 압축 해제합니다."""
     buf = io.BytesIO(gzipped_data)
     with gzip.GzipFile(fileobj=buf, mode="rb") as gz:
         return gz.read()
+
 
 def upload_behavior_chunk(chunk: EventChunk):
     """
@@ -80,6 +85,7 @@ def upload_behavior_chunk(chunk: EventChunk):
     except Exception as e:
         logger.error(f"클라이언트 토큰 {chunk.session_id}에 대한 청크 KS3 업로드 실패: {e}")
 
+
 def upload_entire_session_behavior(payload: CaptchaVerificationRequest, session_id: str):
     """
     전체 세션의 행동 데이터를 직렬화, 압축하여 KS3에 업로드합니다.
@@ -97,14 +103,15 @@ def upload_entire_session_behavior(payload: CaptchaVerificationRequest, session_
         # meta와 events는 이미 딕셔너리/딕셔너리 리스트이므로 model_dump 필요 없음
         meta = payload.meta if payload.meta else {}
         events = payload.events if payload.events else []
-        
+
         lines = [json.dumps({"type": "meta", **meta}, ensure_ascii=False)]
         for ev in events:
-            lines.append(json.dumps({"type": "event", **ev}, ensure_ascii=False))
+            lines.append(json.dumps(
+                {"type": "event", **ev}, ensure_ascii=False))
         body = ("\n".join(lines) + "\n").encode("utf-8")
 
         gzipped_body = _gzip_bytes(body)
-        
+
         ts = datetime.now(settings.TIMEZONE).strftime("%Y%m%d-%H%M%S")
         fname = f"{ts}_{session_id}.json.gz"
         prefix = settings.KS3_PREFIX.strip('/')
@@ -120,6 +127,7 @@ def upload_entire_session_behavior(payload: CaptchaVerificationRequest, session_
     except Exception as e:
         logger.error(f"클라이언트 토큰 {session_id}에 대한 세션 데이터 KS3 업로드 실패: {e}")
         return (None, None, f"업로드 오류: {e}")
+
 
 def download_behavior_chunks(client_token: str) -> List[Dict[str, Any]]:
     """
@@ -137,7 +145,8 @@ def download_behavior_chunks(client_token: str) -> List[Dict[str, Any]]:
     chunk_prefix = f"behavior-chunks/{client_token}/"
 
     try:
-        response = s3_client.list_objects_v2(Bucket=settings.KS3_BUCKET, Prefix=chunk_prefix)
+        response = s3_client.list_objects_v2(
+            Bucket=settings.KS3_BUCKET, Prefix=chunk_prefix)
         if "Contents" not in response:
             logger.info(f"클라이언트 토큰 {client_token}에 대한 청크를 찾을 수 없습니다.")
             return []
@@ -149,16 +158,18 @@ def download_behavior_chunks(client_token: str) -> List[Dict[str, Any]]:
         for key in chunk_keys:
             obj = s3_client.get_object(Bucket=settings.KS3_BUCKET, Key=key)
             gzipped_content = obj["Body"].read()
-            decompressed_content = _ungzip_bytes(gzipped_content).decode("utf-8")
+            decompressed_content = _ungzip_bytes(
+                gzipped_content).decode("utf-8")
             chunk_data = json.loads(decompressed_content)
-            
+
             # chunk_data가 EventChunk 구조라고 가정
             if "events" in chunk_data:
                 all_events.extend(chunk_data["events"])
             else:
-                logger.warning(f"청크 {key}에 'events' 키가 없습니다.")
+                logger.info(f"청크 {key}에 'events' 키가 없습니다.")
 
-        logger.info(f"클라이언트 토큰 {client_token}에 대해 {len(chunk_keys)}개의 청크를 성공적으로 다운로드하고 병합했습니다.")
+        logger.info(
+            f"클라이언트 토큰 {client_token}에 대해 {len(chunk_keys)}개의 청크를 성공적으로 다운로드하고 병합했습니다.")
         return all_events
 
     except Exception as e:

@@ -62,7 +62,7 @@ def _load_threshold_once() -> float:
         with open(THR_JSON, "r", encoding="utf-8") as f:
             _THRESHOLD = float(json.load(f).get("val_threshold", 0.5))
     except Exception as e:
-        logger.warning(f"[경고] thresholds.json 로드 실패: {e}")
+        logger.info(f"[경고] thresholds.json 로드 실패: {e}")
         _THRESHOLD = 0.5
     return _THRESHOLD
 
@@ -87,7 +87,7 @@ def get_model() -> Optional[nn.Module]:
             _MODEL = m
             logger.info(f"행동검증모델(best.pt) 로드 완료: {BEST_PT}")
         except Exception as e:
-            logger.warning(f"행동검증모델(best.pt) 로드 실패: {e}")
+            logger.info(f"행동검증모델(best.pt) 로드 실패: {e}")
             _MODEL = None
         return _MODEL
 
@@ -251,14 +251,14 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
     """
     rect_track, rect_oob = _roi_rects(meta)
     if rect_track is None:
-        logger.warning(
+        logger.info(
             f"build_window_7ch: rect_track이 None이므로 전처리 건너뜀. meta: {meta}")
         # 🔒 canvas가 없으면 모델 입력을 만들지 않음(폴백 금지)
         return None, 0, False, (rect_oob is not None), 0.0, 0.0
 
     pts = _flatten_events(meta, events)
     if not pts:
-        logger.warning(
+        logger.info(
             f"build_window_7ch: 평탄화된 이벤트(pts)가 없으므로 전처리 건너뜀. events: {events}")
         return None, 0, True, (rect_oob is not None), 0.0, 0.0
 
@@ -355,7 +355,7 @@ def run_behavior_verification(meta: Dict[str, Any], events: List[Dict[str, Any]]
     X, raw_len, has_track, has_wrap, oob_c, oob_w = build_window_7ch(
         meta, events, T=300)
     if X is None:
-        logger.warning("특징 추출 결과가 None입니다. 추론을 건너뜁니다.")
+        logger.info("특징 추출 결과가 None입니다. 추론을 건너뜁니다.")
         return {"ok": False, "error": "empty or invalid events/roi"}
 
     # (추론)

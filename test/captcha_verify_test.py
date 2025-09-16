@@ -13,6 +13,17 @@ import requests
 from botocore.config import Config
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional
+import logging
+
+# 로거 설정
+logger = logging.getLogger(__name__)
+# 기본 핸들러가 없으면 추가 (중복 방지)
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    handler.setFormatter(formatter)  # Corrected typo here
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)  # 기본 레벨은 INFO
 
 # --- 설정 --- #
 # 사용하실 API 키를 여기에 입력하세요.
@@ -44,8 +55,8 @@ def load_s3_config():
     }
     required_keys = ["endpoint_url", "bucket_name", "access_key", "secret_key"]
     if not all(config[key] for key in required_keys):
-        print("오류: S3 설정에 필요한 환경 변수가 누락되었습니다.", file=sys.stderr)
-        print(f"필수 항목: {required_keys}", file=sys.stderr)
+        logger.error("S3 설정에 필요한 환경 변수가 누락되었습니다.")
+        logger.error(f"필수 항목: {required_keys}")
         sys.exit(1)
     return config
 
@@ -69,7 +80,7 @@ def get_s3_client(config):
 def download_and_parse_session(client, bucket, key):
     """S3에서 세션 파일을 다운로드하고 파싱하여 meta와 events를 추출합니다."""
     try:
-        print(f"S3 버킷 '{bucket}'에서 파일 다운로드 중: {key}", file=sys.stderr)
+        logger.info(f"S3 버킷 '{bucket}'에서 파일 다운로드 중: {key}")
         response = client.get_object(Bucket=bucket, Key=key)
         with gzip.GzipFile(fileobj=io.BytesIO(response["Body"].read()), mode="rb") as gz:
             content = gz.read().decode("utf-8")
@@ -89,38 +100,37 @@ def download_and_parse_session(client, bucket, key):
                         data["t"] = data["payload"]["base_t"]
                     events.append(data)
             except json.JSONDecodeError:
-                print(f"경고: JSON 파싱 실패, 라인 건너뜀: {line}", file=sys.stderr)
+                logger.info(f"JSON 파싱 실패, 라인 건너뜀: {line}")
                 continue
 
         if not meta:
-            print("오류: 파일에서 'meta' 정보를 찾을 수 없습니다.", file=sys.stderr)
+            logger.error("파일에서 'meta' 정보를 찾을 수 없습니다.")
             return None
         return {"meta": meta, "events": events}
     except client.exceptions.NoSuchKey:
-        print(
-            f"오류: S3 버킷 '{bucket}'에서 파일 '{key}'를 찾을 수 없습니다.", file=sys.stderr)
+        logger.error(
+            f"오류: S3 버킷 '{bucket}'에서 파일 '{key}'를 찾을 수 없습니다.")
         return None
     except Exception as e:
-        print(f"파일 다운로드 또는 처리 중 오류 발생: {e}", file=sys.stderr)
+        logger.error(f"파일 다운로드 또는 처리 중 오류 발생: {e}")
         return None
 
 
 def get_captcha_problem(problem_url, api_key):
     """/captcha/problem API를 호출하여 새로운 캡챠 문제 정보를 받습니다."""
     try:
-        print(f"'{problem_url}'에서 새로운 캡챠 문제 요청 중...", file=sys.stderr)
+        logger.info(f"'{problem_url}'에서 새로운 캡챠 문제 요청 중...")
         headers = {"X-Api-Key": api_key}
         response = requests.post(problem_url, headers=headers)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"오류: /captcha/problem API 호출 실패: {e}", file=sys.stderr)
-        print(f"응답: {e.response.text if e.response else 'N/A'}",
-              file=sys.stderr)
+        logger.error(f"/captcha/problem API 호출 실패: {e}")
+        logger.error(f"응답: {e.response.text if e.response else 'N/A'}")
         return None
     except KeyError:
-        print("오류: /captcha/problem 응답에 필수 필드가 없습니다.", file=sys.stderr)
-        print(f"응답: {response.text}", file=sys.stderr)
+        logger.error("/captcha/problem 응답에 필수 필드가 없습니다.")
+        logger.error(f"응답: {response.text}")
         return None
 
 
@@ -136,8 +146,8 @@ def send_event_chunk(
 ):
     """/api/events/chunk API를 호출하여 이벤트 청크를 전송합니다."""
     try:
-        print(
-            f"'{chunk_url}'로 이벤트 청크 {chunk_index+1}/{total_chunks} 전송 중...", file=sys.stderr)
+        logger.info(
+            f"'{chunk_url}'로 이벤트 청크 {chunk_index+1}/{total_chunks} 전송 중...")
         request_body = {
             "session_id": client_token,
             "chunk_index": chunk_index,
@@ -146,24 +156,23 @@ def send_event_chunk(
             "meta": meta,
             "timestamp": timestamp
         }
-        # print(f"전송할 청크 데이터: {json.dumps(request_body, indent=2, ensure_ascii=False)}", file=sys.stderr) # 디버깅용
+        # logger.debug(f"전송할 청크 데이터: {json.dumps(request_body, indent=2, ensure_ascii=False)}") # 디버깅용
         headers = {"Content-Type": "application/json"}
         response = requests.post(chunk_url, headers=headers, json=request_body)
         response.raise_for_status()
-        print(f"청크 {chunk_index+1} 전송 성공: {response.json()}", file=sys.stderr)
+        logger.info(f"청크 {chunk_index+1} 전송 성공: {response.json()}")
         time.sleep(delay_ms / 1000.0)  # 지연 시간 적용
     except requests.exceptions.RequestException as e:
-        print(
-            f"오류: /api/events/chunk API 호출 실패 (청크 {chunk_index+1}): {e}", file=sys.stderr)
-        print(f"응답: {e.response.text if e.response else 'N/A'}",
-              file=sys.stderr)
+        logger.error(
+            f"/api/events/chunk API 호출 실패 (청크 {chunk_index+1}): {e}")
+        logger.error(f"응답: {e.response.text if e.response else 'N/A'}")
         sys.exit(1)
 
 
 def submit_for_verification(verify_url, api_key, client_token, answer, behavior_data):
     """/captcha/verify API를 호출하여 검증을 요청합니다."""
     try:
-        print(f"'{verify_url}'로 검증 요청 전송 중...", file=sys.stderr)
+        logger.info(f"'{verify_url}'로 검증 요청 전송 중...")
         headers = {"X-Api-Key": api_key, "X-Client-Token": client_token}
         # 청크로 대부분의 이벤트가 전송되었으므로, verify 요청에는 meta와 빈 events 리스트를 보냅니다.
         request_body = {"answer": answer,
@@ -174,36 +183,34 @@ def submit_for_verification(verify_url, api_key, client_token, answer, behavior_
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"오류: /captcha/verify API 호출 실패: {e}", file=sys.stderr)
-        print(f"응답: {e.response.text if e.response else 'N/A'}",
-              file=sys.stderr)
+        logger.error(f"/captcha/verify API 호출 실패: {e}")
+        logger.error(f"응답: {e.response.text if e.response else 'N/A'}")
         return None
 
 
 def poll_for_result(result_url_base, task_id, max_retries=30, interval=2):
     """taskId를 사용하여 최종 검증 결과를 폴링합니다."""
     result_url = f"{result_url_base.strip('/')}/{task_id}"
-    print(f"'{result_url}'에서 최종 결과 폴링 시작...",
-          end="", flush=True, file=sys.stderr)
+    logger.info(f"'{result_url}'에서 최종 결과 폴링 시작...")
     for i in range(max_retries):
         try:
             response = requests.get(result_url)
             if response.status_code == 200:
-                print("\n검증 성공! 최종 결과를 출력합니다.", file=sys.stderr)
+                logger.info("검증 성공! 최종 결과를 출력합니다.")
                 return response.json()
             elif response.status_code == 202:
-                print(".", end="", flush=True, file=sys.stderr)
+                logger.info(".")
                 time.sleep(interval)
                 continue
             else:
-                print(
-                    f"\n오류: 결과 조회 실패 (상태 코드: {response.status_code})", file=sys.stderr)
-                print(f"응답: {response.text}", file=sys.stderr)
+                logger.error(
+                    f"결과 조회 실패 (상태 코드: {response.status_code})")
+                logger.error(f"응답: {response.text}")
                 return None
         except requests.exceptions.RequestException as e:
-            print(f"\n오류: 결과 조회 API 호출 실패: {e}", file=sys.stderr)
+            logger.error(f"결과 조회 API 호출 실패: {e}")
             return None
-    print("\n오류: 폴링 시간 초과. 작업을 완료하지 못했습니다.", file=sys.stderr)
+    logger.error("폴링 시간 초과. 작업을 완료하지 못했습니다.")
     return None
 
 
@@ -211,7 +218,7 @@ def main():
     """메인 실행 함수"""
     # API_KEY가 기본값인지 확인
     if API_KEY == "7c1e6fed6c1fe16713965ecac0c0c130b1e53cdc95fda147c66e3ea7305d00a9":
-        print("오류: 스크립트 상단의 API_KEY 변수에 실제 API 키를 입력해주세요.", file=sys.stderr)
+        logger.error("스크립트 상단의 API_KEY 변수에 실제 API 키를 입력해주세요.")
         sys.exit(1)
 
     parser = argparse.ArgumentParser(
@@ -237,7 +244,7 @@ def main():
     # 2. 새로운 캡챠 문제 정보 발급
     problem_response = get_captcha_problem(args.problem_url, API_KEY)
     if not problem_response or "clientToken" not in problem_response or "options" not in problem_response:
-        print("오류: 캡챠 문제 정보를 제대로 받지 못했습니다.", file=sys.stderr)
+        logger.error("캡챠 문제 정보를 제대로 받지 못했습니다.")
         sys.exit(1)
     client_token = problem_response["clientToken"]
     options = problem_response["options"]
@@ -246,10 +253,10 @@ def main():
     else:
         answer_to_send = options[0]  # 첫 번째 옵션을 정답으로 가정 (테스트 환경이 아닐 경우)
 
-    print(f"새로운 Client-Token 발급 성공: {client_token}", file=sys.stderr)
-    print(f'문제 프롬프트: {problem_response["prompt"]}', file=sys.stderr)
-    print(f'선택지: {options}', file=sys.stderr)
-    print(f'전송할 답변: {answer_to_send}', file=sys.stderr)
+    logger.info(f"새로운 Client-Token 발급 성공: {client_token}")
+    logger.info(f'문제 프롬프트: {problem_response["prompt"]}')
+    logger.info(f'선택지: {options}')
+    logger.info(f'전송할 답변: {answer_to_send}')
 
     # 3. S3에서 행동 데이터 다운로드 및 파싱
     prefix = "human_data" if args.type == 'human' else "bot_data"
@@ -259,14 +266,17 @@ def main():
     if not behavior_data:
         sys.exit(1)
 
+    logger.info("\n--- 다운로드 및 파싱된 행동 데이터 (meta 및 events) ---")
+    logger.info(json.dumps(behavior_data, indent=2, ensure_ascii=False))
+    logger.info("-----------------------------------------------------")
+
     all_events = behavior_data["events"]
     meta_data = behavior_data["meta"]
     total_events = len(all_events)
     total_chunks = (total_events + CHUNK_SIZE - 1) // CHUNK_SIZE
     current_timestamp = int(time.time() * 1000)  # 현재 타임스탬프 (밀리초)
 
-    print(f"총 {total_events}개의 이벤트, {total_chunks}개의 청크로 분할하여 전송합니다.",
-          file=sys.stderr)
+    logger.info(f"총 {total_events}개의 이벤트, {total_chunks}개의 청크로 분할하여 전송합니다.")
 
     # 4. 이벤트 청크 전송
     for i in range(total_chunks):
@@ -287,11 +297,11 @@ def main():
     final_result = submit_for_verification(
         args.verify_url, API_KEY, client_token, answer_to_send, behavior_data)
     if not final_result or "result" not in final_result:
-        print("오류: 검증 요청에서 유효한 결과를 받지 못했습니다.", file=sys.stderr)
+        logger.error("검증 요청에서 유효한 결과를 받지 못했습니다.")
         sys.exit(1)
 
     # 6. 최종 결과 출력 (동기 방식이므로 폴링 필요 없음)
-    print("\n검증 성공! 최종 결과를 출력합니다.", file=sys.stderr)
+    logger.info("검증 성공! 최종 결과를 출력합니다.")
     print(json.dumps(final_result, indent=2, ensure_ascii=False))
 
 
