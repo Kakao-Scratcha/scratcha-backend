@@ -149,7 +149,7 @@ def send_event_chunk(
         logger.info(
             f"'{chunk_url}'로 이벤트 청크 {chunk_index+1}/{total_chunks} 전송 중...")
         request_body = {
-            "session_id": client_token,
+            "client_token": client_token,
             "chunk_index": chunk_index,
             "total_chunks": total_chunks,
             "events": chunk_events,
@@ -164,7 +164,7 @@ def send_event_chunk(
         time.sleep(delay_ms / 1000.0)  # 지연 시간 적용
     except requests.exceptions.RequestException as e:
         logger.error(
-            f"/api/events/chunk API 호출 실패 (청크 {chunk_index+1}): {e}")
+            f"/api/events/chunk API 호출 실패 (청크 {chunk_index+1}, 클라이언트 토큰: {client_token}): {e}")
         logger.error(f"응답: {e.response.text if e.response else 'N/A'}")
         sys.exit(1)
 
@@ -267,7 +267,7 @@ def main():
         sys.exit(1)
 
     logger.info("\n--- 다운로드 및 파싱된 행동 데이터 (meta 및 events) ---")
-    logger.info(json.dumps(behavior_data, indent=2, ensure_ascii=False))
+    # logger.info(json.dumps(behavior_data, indent=2, ensure_ascii=False))
     logger.info("-----------------------------------------------------")
 
     all_events = behavior_data["events"]

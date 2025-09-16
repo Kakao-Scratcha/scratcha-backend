@@ -19,7 +19,7 @@ class EventData(BaseModel):
 
 class EventChunk(BaseModel):
     """여러 사용자 행동 이벤트 데이터를 포함하는 청크 단위를 정의합니다."""
-    session_id: str = Field(..., description="세션의 고유 ID")
+    client_token: str = Field(..., description="클라이언트 토큰")
     chunk_index: int = Field(..., description="현재 청크의 인덱스 (0부터 시작)")
     total_chunks: int = Field(..., description="전체 청크의 수")
     events: List[EventData] = Field(..., description="이벤트 데이터 목록")

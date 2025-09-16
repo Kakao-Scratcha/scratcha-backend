@@ -7,7 +7,7 @@ import gzip
 import boto3
 from botocore.config import Config
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 
 from app.core.config import settings
 from app.schemas.event import EventChunk
@@ -71,7 +71,7 @@ def upload_behavior_chunk(chunk: EventChunk):
         gzipped_body = _gzip_bytes(chunk_json_bytes)
 
         # 버킷 내 객체 키(경로) 정의
-        key = f"behavior-chunks/{chunk.session_id}/chunk_{chunk.chunk_index}_{chunk.total_chunks}.json.gz"
+        key = f"behavior-chunks/{chunk.client_token}/chunk_{chunk.chunk_index}_{chunk.total_chunks}.json.gz"
 
         s3_client.put_object(
             Bucket=settings.KS3_BUCKET,
@@ -83,10 +83,10 @@ def upload_behavior_chunk(chunk: EventChunk):
         logger.info(f"KS3에 청크 업로드 성공: s3://{settings.KS3_BUCKET}/{key}")
 
     except Exception as e:
-        logger.error(f"클라이언트 토큰 {chunk.session_id}에 대한 청크 KS3 업로드 실패: {e}")
+        logger.error(f"클라이언트 토큰 {chunk.client_token}에 대한 청크 KS3 업로드 실패: {e}")
 
 
-def upload_entire_session_behavior(payload: CaptchaVerificationRequest, session_id: str):
+def upload_entire_session_behavior(meta: Dict[str, Any], events: List[Dict[str, Any]], client_token: str):
     """
     전체 세션의 행동 데이터를 직렬화, 압축하여 KS3에 업로드합니다.
     이 함수는 captcha_tasks.py의 원래 upload_ks3_session에서 수정되었습니다.
@@ -100,48 +100,45 @@ def upload_entire_session_behavior(payload: CaptchaVerificationRequest, session_
         return (None, None, "KS3 클라이언트 구성되지 않음")
 
     try:
-        # meta와 events는 이미 딕셔너리/딕셔너리 리스트이므로 model_dump 필요 없음
-        meta = payload.meta if payload.meta else {}
-        events = payload.events if payload.events else []
-
-        lines = [json.dumps({"type": "meta", **meta}, ensure_ascii=False)]
-        for ev in events:
-            lines.append(json.dumps(
-                {"type": "event", **ev}, ensure_ascii=False))
-        body = ("\n".join(lines) + "\n").encode("utf-8")
+        # meta와 events를 하나의 JSON 객체로 병합
+        merged_data = {"meta": meta, "events": events}
+        body = json.dumps(merged_data, ensure_ascii=False).encode("utf-8")
 
         gzipped_body = _gzip_bytes(body)
 
         ts = datetime.now(settings.TIMEZONE).strftime("%Y%m%d-%H%M%S")
-        fname = f"{ts}_{session_id}.json.gz"
-        prefix = settings.KS3_PREFIX.strip('/')
-        key = f"{prefix}/{fname}".strip("/")
+        # 경로를 behavior-chunks/{client_token}/full_session_{ts}.json.gz 형식으로 변경
+        key = f"behavior-chunks/{client_token}/full_session_{ts}.json.gz"
 
         s3_client.put_object(
-            Bucket=settings.KS3_BUCKET, Key=key, Body=gzipped_body,
-            ContentType="application/json", ContentEncoding="gzip",
+            Bucket=settings.KS3_BUCKET,
+            Key=key,
+            Body=gzipped_body,
+            ContentType="application/json",
+            ContentEncoding="gzip",
         )
         logger.info(f"KS3에 세션 데이터 업로드 성공: s3://{settings.KS3_BUCKET}/{key}")
         return (f"s3://{settings.KS3_BUCKET}/{key}", key, len(gzipped_body))
 
     except Exception as e:
-        logger.error(f"클라이언트 토큰 {session_id}에 대한 세션 데이터 KS3 업로드 실패: {e}")
+        logger.error(f"클라이언트 토큰 {client_token}에 대한 세션 데이터 KS3 업로드 실패: {e}")
         return (None, None, f"업로드 오류: {e}")
 
 
-def download_behavior_chunks(client_token: str) -> List[Dict[str, Any]]:
+def download_behavior_chunks(client_token: str) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """
     주어진 client_token에 대한 모든 행동 청크를 KS3에서 다운로드, 압축 해제 및 병합합니다.
     """
     if not settings.ENABLE_KS3:
         logger.info("KS3 업로드가 비활성화되어 있습니다. 청크 다운로드를 건너뜁니다.")
-        return []
+        return [], None
 
     s3_client = _get_ks3_client()
     if not s3_client:
-        return []
+        return [], None
 
     all_events = []
+    session_meta: Optional[Dict[str, Any]] = None
     chunk_prefix = f"behavior-chunks/{client_token}/"
 
     try:
@@ -149,7 +146,7 @@ def download_behavior_chunks(client_token: str) -> List[Dict[str, Any]]:
             Bucket=settings.KS3_BUCKET, Prefix=chunk_prefix)
         if "Contents" not in response:
             logger.info(f"클라이언트 토큰 {client_token}에 대한 청크를 찾을 수 없습니다.")
-            return []
+            return all_events, session_meta
 
         # 청크를 올바른 순서로 정렬하기 위해 인덱스 기준으로 정렬
         chunk_keys = sorted([obj["Key"] for obj in response["Contents"] if obj["Key"].endswith(".json.gz")],
@@ -167,11 +164,14 @@ def download_behavior_chunks(client_token: str) -> List[Dict[str, Any]]:
                 all_events.extend(chunk_data["events"])
             else:
                 logger.info(f"청크 {key}에 'events' 키가 없습니다.")
+            
+            if session_meta is None and "meta" in chunk_data:
+                session_meta = chunk_data["meta"]
 
         logger.info(
             f"클라이언트 토큰 {client_token}에 대해 {len(chunk_keys)}개의 청크를 성공적으로 다운로드하고 병합했습니다.")
-        return all_events
+        return all_events, session_meta
 
     except Exception as e:
         logger.error(f"클라이언트 토큰 {client_token}에 대한 청크 다운로드 또는 병합 실패: {e}")
-        return []
+        return all_events, session_meta

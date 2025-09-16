@@ -22,7 +22,7 @@ class EventService:
         Returns:
             Dict[str, Any]: 청크 처리 결과 메시지.
         """
-        logger.info(f"세션 {chunk.session_id}의 청크 {chunk.chunk_index}/{chunk.total_chunks} 수신. 이벤트 수: {len(chunk.events)}")
+        logger.info(f"세션 {chunk.client_token}의 청크 {chunk.chunk_index}/{chunk.total_chunks} 수신. 이벤트 수: {len(chunk.events)}")
         
         # KS3에 청크 업로드
         upload_behavior_chunk(chunk)

@@ -85,15 +85,13 @@ def verifyCaptchaTask(self, clientToken: str, answer: str, ipAddress: str, userA
 
 
 @celery_app.task
-def uploadBehaviorDataTask(clientToken: str, request_data: Dict[str, Any]):
+def uploadBehaviorDataTask(clientToken: str, meta: Dict[str, Any], events: List[Dict[str, Any]]):
     """
     행동 데이터를 S3/KS3에 비동기적으로 업로드하는 Celery 작업입니다.
     """
     logger.info(f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 중...")
     try:
-        # 딕셔너리로부터 CaptchaVerificationRequest 재구성
-        request = CaptchaVerificationRequest(**request_data)
-        upload_entire_session_behavior(request, clientToken)
+        upload_entire_session_behavior(meta, events, clientToken)
         logger.info(
             f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 성공")
     except Exception as e:

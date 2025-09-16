@@ -190,7 +190,7 @@ class CaptchaService:
             # 행동 데이터 업로드를 비동기 작업으로 처리
             # 이 시점의 request.dict()는 events가 비어있을 수 있습니다.
             if settings.ENABLE_KS3:
-                uploadBehaviorDataTask.delay(clientToken, request.dict())
+                uploadBehaviorDataTask.delay(clientToken, request.meta, request.events)
 
             if session.createdAt.tzinfo is None:
                 session.createdAt = settings.TIMEZONE.localize(
@@ -220,17 +220,17 @@ class CaptchaService:
             # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
             logger.info(
                 f"[디버그] KS3에서 행동 데이터 청크 다운로드 시도. clientToken: {clientToken}")
-            full_events_from_chunks = download_behavior_chunks(clientToken)
+            full_events_from_chunks, session_meta = download_behavior_chunks(clientToken)
             logger.info(
                 f"[디버그] KS3에서 다운로드된 전체 이벤트 수: {len(full_events_from_chunks)}")
 
             # request.meta는 verify 요청에 포함된 메타데이터를 사용합니다.
             # 행동 분석은 KS3에서 가져온 전체 이벤트 데이터를 사용합니다.
-            if request.meta and full_events_from_chunks:
+            if session_meta and full_events_from_chunks:
                 # logger.info(f"[디버그] 행동 데이터 메타: {request.meta}") # 디버깅용
                 # logger.info(f"[디버그] 행동 이벤트 (KS3에서 로드됨): {full_events_from_chunks}") # 디버깅용
                 behavior_result = behavior_service.run_behavior_verification(
-                    request.meta, full_events_from_chunks)
+                    session_meta, full_events_from_chunks)
                 logger.info(f"[디버그] 행동 분석 결과: {behavior_result}",
                             )  # 디버깅용
                 if behavior_result and behavior_result.get("ok"):
@@ -265,9 +265,8 @@ class CaptchaService:
                 result=result,
                 latency_ms=int(latency.total_seconds() * 1000),
                 is_correct=is_correct,
-                ml_confidence=confidence,
-                # Convert verdict to boolean
-                ml_is_bot=(verdict == "bot") if verdict else None
+                ml_confidence=None,
+                ml_is_bot=None
             )
 
             # 11. API 키 사용 통계에 검증 결과를 업데이트합니다.
