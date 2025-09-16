@@ -156,7 +156,7 @@ def send_event_chunk(
             "meta": meta,
             "timestamp": timestamp
         }
-        # logger.debug(f"전송할 청크 데이터: {json.dumps(request_body, indent=2, ensure_ascii=False)}") # 디버깅용
+        # logger.info(f"전송할 청크 데이터: {json.dumps(request_body, indent=2, ensure_ascii=False)}") # 디버깅용
         headers = {"Content-Type": "application/json"}
         response = requests.post(chunk_url, headers=headers, json=request_body)
         response.raise_for_status()

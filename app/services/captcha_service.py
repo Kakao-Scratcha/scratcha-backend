@@ -217,7 +217,7 @@ class CaptchaService:
             # KS3에서 청크 데이터 다운로드 및 병합
             # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
             full_events_from_chunks = download_behavior_chunks(clientToken)
-            logger.debug(
+            logger.info(
                 f"KS3에서 다운로드된 전체 이벤트 수: {len(full_events_from_chunks)}")
 
             # request.meta는 verify 요청에 포함된 메타데이터를 사용합니다.

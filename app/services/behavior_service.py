@@ -156,7 +156,7 @@ def _roi_rects(meta: Any) -> Tuple[Optional[Tuple[float, float, float, float]], 
     # 🔒 canvas 기준을 강제: canvas가 없으면 track 없음으로 간주
     rect_track = rect_canvas
     rect_oob = rect_wrap
-    logger.debug(
+    logger.info(
         f"_roi_rects 결과: rect_track={rect_track}, rect_oob={rect_oob}")
     return rect_track, rect_oob
 
@@ -198,7 +198,7 @@ def _flatten_events(meta: Any, events: List[Any]):
                 continue
             out.append((int(t), float(xr), float(yr)))
     out.sort(key=lambda x: x[0])
-    logger.debug(f"_flatten_events 결과: {len(out)}개의 포인트, 첫 5개: {out[:5]}")
+    logger.info(f"_flatten_events 결과: {len(out)}개의 포인트, 첫 5개: {out[:5]}")
     return out
 
 # ---------- 시간 단위 보정 (sec/ms/us → ms) ----------

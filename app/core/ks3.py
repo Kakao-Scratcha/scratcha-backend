@@ -58,7 +58,7 @@ def upload_behavior_chunk(chunk: EventChunk):
     단일 이벤트 청크를 직렬화, 압축하여 KS3에 업로드합니다.
     """
     if not settings.ENABLE_KS3:
-        logger.debug("KS3 업로드가 비활성화되어 있습니다. 청크 업로드를 건너뜁니다.")
+        logger.info("KS3 업로드가 비활성화되어 있습니다. 청크 업로드를 건너뜁니다.")
         return
 
     s3_client = _get_ks3_client()
@@ -92,7 +92,7 @@ def upload_entire_session_behavior(payload: CaptchaVerificationRequest, session_
     이 함수는 captcha_tasks.py의 원래 upload_ks3_session에서 수정되었습니다.
     """
     if not settings.ENABLE_KS3:
-        logger.debug("KS3 업로드가 비활성화되어 있습니다. 세션 업로드를 건너뜁니다.")
+        logger.info("KS3 업로드가 비활성화되어 있습니다. 세션 업로드를 건너뜁니다.")
         return (None, None, "KS3 업로드 비활성화됨")
 
     s3_client = _get_ks3_client()
@@ -134,7 +134,7 @@ def download_behavior_chunks(client_token: str) -> List[Dict[str, Any]]:
     주어진 client_token에 대한 모든 행동 청크를 KS3에서 다운로드, 압축 해제 및 병합합니다.
     """
     if not settings.ENABLE_KS3:
-        logger.debug("KS3 업로드가 비활성화되어 있습니다. 청크 다운로드를 건너뜁니다.")
+        logger.info("KS3 업로드가 비활성화되어 있습니다. 청크 다운로드를 건너뜁니다.")
         return []
 
     s3_client = _get_ks3_client()
