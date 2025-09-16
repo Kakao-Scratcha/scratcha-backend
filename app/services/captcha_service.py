@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 import uuid
 import random
-import sys  # 디버깅용 print를 위해 임시로 추가
+import sys  # 디버깅용 logger.info를 위해 임시로 추가
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -52,11 +52,11 @@ class CaptchaService:
         Returns:
             CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보 (클라이언트 토큰, 이미지 URL, 프롬프트, 선택지).
         """
-        print(
-            f"[디버그] generateCaptchaProblem 호출됨. settings.ENV: {settings.ENV}", file=sys.stderr)  # 디버깅용
+        logger.info(
+            f"[디버그] generateCaptchaProblem 호출됨. settings.ENV: {settings.ENV}")  # 디버깅용
         # 디버깅용
-        print(
-            f"[디버그] API Key ID: {apiKey.id}, Difficulty: {apiKey.difficulty}", file=sys.stderr)
+        logger.info(
+            f"[디버그] API Key ID: {apiKey.id}, Difficulty: {apiKey.difficulty}")
         try:
             # 1. API 키에 연결된 사용자(User) 객체를 조회하고, 비관적 잠금(with_for_update)을 적용하여 동시성 문제를 방지합니다.
             user: User = self.db.query(User).filter(
@@ -133,8 +133,8 @@ class CaptchaService:
                 correctAnswer=selectedProblem.answer if settings.ENV == "test" else None
             )
             # 디버깅용
-            print(
-                f"[디버그] 반환될 CaptchaProblemResponse: {response_data}", file=sys.stderr)
+            logger.info(
+                f"[디버그] 반환될 CaptchaProblemResponse: {response_data}")
             return response_data
 
         except HTTPException as e:
@@ -153,6 +153,8 @@ class CaptchaService:
         ipAddress: Optional[str],
         userAgent: Optional[str]
     ) -> CaptchaVerificationResponse:
+        logger.info(
+            f"[디버그] verifyCaptchaAnswer 호출됨. clientToken: {clientToken}, request: {request.dict()}, ipAddress: {ipAddress}, userAgent: {userAgent}")
         """
         제출된 캡챠 답변을 검증하고, 결과를 기록하는 비즈니스 로직입니다.
 
@@ -216,38 +218,40 @@ class CaptchaService:
 
             # KS3에서 청크 데이터 다운로드 및 병합
             # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
+            logger.info(
+                f"[디버그] KS3에서 행동 데이터 청크 다운로드 시도. clientToken: {clientToken}")
             full_events_from_chunks = download_behavior_chunks(clientToken)
             logger.info(
-                f"KS3에서 다운로드된 전체 이벤트 수: {len(full_events_from_chunks)}")
+                f"[디버그] KS3에서 다운로드된 전체 이벤트 수: {len(full_events_from_chunks)}")
 
             # request.meta는 verify 요청에 포함된 메타데이터를 사용합니다.
             # 행동 분석은 KS3에서 가져온 전체 이벤트 데이터를 사용합니다.
             if request.meta and full_events_from_chunks:
-                # print(f"[디버그] 행동 데이터 메타: {request.meta}", file=sys.stderr) # 디버깅용
-                # print(f"[디버그] 행동 이벤트 (KS3에서 로드됨): {full_events_from_chunks}", file=sys.stderr) # 디버깅용
+                # logger.info(f"[디버그] 행동 데이터 메타: {request.meta}") # 디버깅용
+                # logger.info(f"[디버그] 행동 이벤트 (KS3에서 로드됨): {full_events_from_chunks}") # 디버깅용
                 behavior_result = behavior_service.run_behavior_verification(
                     request.meta, full_events_from_chunks)
-                print(f"[디버그] 행동 분석 결과: {behavior_result}",
-                      file=sys.stderr)  # 디버깅용
+                logger.info(f"[디버그] 행동 분석 결과: {behavior_result}",
+                            )  # 디버깅용
                 if behavior_result and behavior_result.get("ok"):
                     confidence = behavior_result.get("bot_prob")
                     verdict = behavior_result.get("verdict")
                     # 디버깅용
-                    print(
-                        f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}", file=sys.stderr)
+                    logger.info(
+                        f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}")
 
             # 7. 세션에 연결된 캡챠 문제의 정답을 가져옵니다.
             correct_answer = session.captchaProblem.answer
             # 8. 사용자가 제출한 답변과 정답을 비교하여 성공 여부를 판단합니다.
             # 디버깅용
-            print(
-                f"[디버그] 비교 중: request.answer='{request.answer}' (type: {type(request.answer)}), correct_answer='{correct_answer}' (type: {type(correct_answer)})", file=sys.stderr)
+            logger.info(
+                f"[디버그] 비교 중: request.answer='{request.answer}' (type: {type(request.answer)}), correct_answer='{correct_answer}' (type: {type(correct_answer)})")
             is_correct = request.answer == correct_answer
 
             # 9. 성공 여부에 따라 결과(SUCCESS/FAIL)와 메시지를 설정합니다.
             # 디버깅용
-            print(
-                f"[디버그] 비교 중: is_correct={is_correct}, verdict={verdict}", file=sys.stderr)
+            logger.info(
+                f"[디버그] 비교 중: is_correct={is_correct}, verdict={verdict}")
             if is_correct and verdict == "human":
                 result = CaptchaResult.SUCCESS
                 message = "캡챠 검증에 성공했습니다."

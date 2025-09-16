@@ -1,3 +1,5 @@
+from starlette.middleware.base import BaseHTTPMiddleware
+from app.routers import events_router
 from fastapi import FastAPI, Request, status, HTTPException
 import logging.config
 from fastapi.exceptions import RequestValidationError
@@ -19,13 +21,13 @@ from app.core.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 애플리케이션 시작 이벤트
-    print("로깅 설정 적용...")
+    logger.info("로깅 설정 적용...")
     logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
     yield
     # 애플리케이션 종료 이벤트
-    print("데이터베이스 연결 풀 해제...")
+    logger.info("데이터베이스 연결 풀 해제...")
     engine.dispose()
-    print("애플리케이션 종료.")
+    logger.info("애플리케이션 종료.")
 
 app = FastAPI(
     title="Dashboard API",
@@ -114,11 +116,11 @@ def read_root():
 
 
 # 라우터 등록
-from app.routers import events_router
-from starlette.middleware.base import BaseHTTPMiddleware
+
 
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     """요청 본문 크기를 제한하는 미들웨어입니다."""
+
     def __init__(self, app: FastAPI, max_size: int):
         super().__init__(app)
         self.max_size = max_size
@@ -128,10 +130,12 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         if content_length and int(content_length) > self.max_size:
             return JSONResponse(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                content={'detail': f'요청 본문 크기가 너무 큽니다. 제한은 {self.max_size} 바이트입니다.'}
+                content={
+                    'detail': f'요청 본문 크기가 너무 큽니다. 제한은 {self.max_size} 바이트입니다.'}
             )
         response = await call_next(request)
         return response
+
 
 # 10MB 요청 크기 제한 미들웨어 추가
 app.add_middleware(RequestSizeLimitMiddleware, max_size=10 * 1024 * 1024)
