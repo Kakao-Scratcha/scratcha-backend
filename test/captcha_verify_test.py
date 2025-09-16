@@ -302,7 +302,7 @@ def main():
 
     # 6. 최종 결과 출력 (동기 방식이므로 폴링 필요 없음)
     logger.info("검증 성공! 최종 결과를 출력합니다.")
-    print(json.dumps(final_result, indent=2, ensure_ascii=False))
+    logger.info(json.dumps(final_result, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
