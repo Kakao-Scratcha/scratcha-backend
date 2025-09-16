@@ -267,7 +267,7 @@ def main():
         sys.exit(1)
 
     logger.info("\n--- 다운로드 및 파싱된 행동 데이터 (meta 및 events) ---")
-    # logger.info(json.dumps(behavior_data, indent=2, ensure_ascii=False))
+    logger.info(json.dumps(behavior_data, indent=2, ensure_ascii=False))
     logger.info("-----------------------------------------------------")
 
     all_events = behavior_data["events"]

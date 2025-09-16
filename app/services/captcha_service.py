@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 import uuid
 import random
-import sys  # 디버깅용 logger.info를 위해 임시로 추가
+import sys
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -20,11 +20,53 @@ from app.repositories.usage_stats_repo import UsageStatsRepository
 from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationRequest, CaptchaVerificationResponse
 from app.models.captcha_log import CaptchaResult
 from app.services import behavior_service
-from app.core.ks3 import download_behavior_chunks  # KS3에서 청크 다운로드 함수 임포트
+from app.core.ks3 import download_behavior_chunks
+from app.models.captcha_session import CaptchaSession # Import CaptchaSession
 
-# 로거 설정
 logger = logging.getLogger(__name__)
 
+class RuleCheckService:
+    def __init__(self, db: Session, captcha_repo: CaptchaRepository, usage_stats_repo: UsageStatsRepository):
+        self.db = db
+        self.captchaRepo = captcha_repo
+        self.usageStatsRepo = usage_stats_repo
+
+    def check_time_constraint(self, session: CaptchaSession, latency: timedelta) -> Optional[CaptchaVerificationResponse]:
+        if latency < timedelta(seconds=1.5):
+            logger.info(f"[디버그] 너무 빠른 캡챠 시도 감지. clientToken: {session.clientToken}, latency: {latency}")
+            self.captchaRepo.createCaptchaLog(
+                session=session,
+                result=CaptchaResult.FAIL,
+                latency_ms=int(latency.total_seconds() * 1000),
+                is_correct=False,
+                ml_confidence=None,
+                ml_is_bot=None
+            )
+            self.usageStatsRepo.incrementVerificationResult(
+                session.keyId, CaptchaResult.FAIL.value, int(latency.total_seconds() * 1000))
+            self.db.commit()
+            return CaptchaVerificationResponse(result="fail", message="너무 빠르게 캡챠를 시도했습니다.")
+        return None
+
+    def check_oob_ratio(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
+        oob_ratio = behavior_result.get("oob_ratio")
+        if oob_ratio is not None and oob_ratio >= 1.0:
+            logger.info(f"[디버그] OOB 비율 100% 감지. clientToken: {session.clientToken}, oob_ratio: {oob_ratio}")
+            result = CaptchaResult.FAIL
+            message = "행동 데이터 OOB 비율이 100%입니다. 캡챠 검증에 실패했습니다."
+            self.captchaRepo.createCaptchaLog(
+                session=session,
+                result=result,
+                latency_ms=int(latency.total_seconds() * 1000),
+                is_correct=False,
+                ml_confidence=confidence,
+                ml_is_bot=True
+            )
+            self.usageStatsRepo.incrementVerificationResult(
+                session.keyId, result.value, int(latency.total_seconds() * 1000))
+            self.db.commit()
+            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
+        return None
 
 class CaptchaService:
     """캡챠 문제 생성 및 검증과 관련된 비즈니스 로직을 처리하는 서비스 클래스입니다."""
@@ -180,7 +222,6 @@ class CaptchaService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="유효하지 않은 클라이언트 토큰입니다."
                 )
-
             if self.captchaRepo.does_log_exist_for_session(session.id):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -197,6 +238,15 @@ class CaptchaService:
                     session.createdAt)
 
             latency = datetime.now(settings.TIMEZONE) - session.createdAt
+            
+            # Instantiate RuleCheckService
+            rule_checker = RuleCheckService(self.db, self.captchaRepo, UsageStatsRepository(self.db))
+
+            # Apply time constraint check
+            time_check_result = rule_checker.check_time_constraint(session, latency)
+            if time_check_result:
+                return time_check_result
+
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
                     session=session,
@@ -237,6 +287,12 @@ class CaptchaService:
                 if behavior_result and behavior_result.get("ok"):
                     confidence = behavior_result.get("bot_prob")
                     verdict = behavior_result.get("verdict")
+
+                    # Apply OOB ratio check
+                    oob_check_result = rule_checker.check_oob_ratio(session, latency, behavior_result, confidence)
+                    if oob_check_result:
+                        return oob_check_result
+
                     # 디버깅용
                     logger.info(
                         f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}")
