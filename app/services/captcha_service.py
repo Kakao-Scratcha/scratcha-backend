@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 import uuid
 import random
+import sys  # 디버깅용 print를 위해 임시로 추가
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -19,12 +20,15 @@ from app.repositories.usage_stats_repo import UsageStatsRepository
 from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationRequest, CaptchaVerificationResponse
 from app.models.captcha_log import CaptchaResult
 from app.services import behavior_service
+from app.core.ks3 import download_behavior_chunks  # KS3에서 청크 다운로드 함수 임포트
 
 # 로거 설정
 logger = logging.getLogger(__name__)
 
 
 class CaptchaService:
+    """캡챠 문제 생성 및 검증과 관련된 비즈니스 로직을 처리하는 서비스 클래스입니다."""
+
     def __init__(self, db: Session):
         """
         CaptchaService의 생성자입니다.
@@ -37,7 +41,7 @@ class CaptchaService:
 
     def generateCaptchaProblem(self, apiKey: ApiKey, ipAddress: Optional[str], userAgent: Optional[str]) -> CaptchaProblemResponse:
         """
-        새로운 캡챠 문제를 생성하고, 사용자 토큰을 차감하며, 캡챠 세션 정보를 반환하는 비즈니스 로직입니다.
+        새로운 캡챠 문제를 생성하고, 사용자 토큰을 차감하며, 캡챠 세션 정보를 반환합니다.
         이 과정은 단일 트랜잭션으로 처리됩니다.
 
         Args:
@@ -48,6 +52,11 @@ class CaptchaService:
         Returns:
             CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보 (클라이언트 토큰, 이미지 URL, 프롬프트, 선택지).
         """
+        print(
+            f"[디버그] generateCaptchaProblem 호출됨. settings.ENV: {settings.ENV}", file=sys.stderr)  # 디버깅용
+        # 디버깅용
+        print(
+            f"[디버그] API Key ID: {apiKey.id}, Difficulty: {apiKey.difficulty}", file=sys.stderr)
         try:
             # 1. API 키에 연결된 사용자(User) 객체를 조회하고, 비관적 잠금(with_for_update)을 적용하여 동시성 문제를 방지합니다.
             user: User = self.db.query(User).filter(
@@ -90,7 +99,7 @@ class CaptchaService:
             if not s3BaseUrl:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="KS3_BASE_URL 환경 변수가 설정되지 않았습니다."  # Changed from S3_BASE_URL
+                    detail="KS3_BASE_URL 환경 변수가 설정되지 않았습니다."
                 )
 
             # S3 이미지 키와 S3_BASE_URL을 조합하여 클라이언트가 직접 접근할 수 있는 전체 URL을 생성합니다.
@@ -115,12 +124,19 @@ class CaptchaService:
             ]
             random.shuffle(option_list)
 
-            return CaptchaProblemResponse(
+            response_data = CaptchaProblemResponse(
                 clientToken=session.clientToken,
-                imageUrl=fullImageUrl,  # S3 직접 이미지 URL을 반환
+                imageUrl=fullImageUrl,
                 prompt=selectedProblem.prompt,
-                options=option_list
+                options=option_list,
+                # 테스트 환경에서만 정답을 포함합니다.
+                correctAnswer=selectedProblem.answer if settings.ENV == "test" else None
             )
+            # 디버깅용
+            print(
+                f"[디버그] 반환될 CaptchaProblemResponse: {response_data}", file=sys.stderr)
+            return response_data
+
         except HTTPException as e:
             # 13. HTTP 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 해당 예외를 다시 발생시킵니다.
             self.db.rollback()
@@ -170,6 +186,7 @@ class CaptchaService:
                 )
 
             # 행동 데이터 업로드를 비동기 작업으로 처리
+            # 이 시점의 request.dict()는 events가 비어있을 수 있습니다.
             if settings.ENABLE_KS3:
                 uploadBehaviorDataTask.delay(clientToken, request.dict())
 
@@ -183,7 +200,7 @@ class CaptchaService:
                     session=session,
                     result=CaptchaResult.TIMEOUT,
                     latency_ms=int(latency.total_seconds() * 1000),
-                    is_correct=False,  # Timeout implies incorrect
+                    is_correct=False,  # 타임아웃은 오답을 의미
                     ml_confidence=None,
                     ml_is_bot=None
                 )
@@ -196,25 +213,41 @@ class CaptchaService:
             # 행동 데이터 분석
             confidence = None
             verdict = None
-            if request.meta and request.events:
-                logger.debug(f"행동 데이터 메타: {request.meta}")
-                logger.debug(f"행동 이벤트: {request.events}")
+
+            # KS3에서 청크 데이터 다운로드 및 병합
+            # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
+            full_events_from_chunks = download_behavior_chunks(clientToken)
+            logger.debug(
+                f"KS3에서 다운로드된 전체 이벤트 수: {len(full_events_from_chunks)}")
+
+            # request.meta는 verify 요청에 포함된 메타데이터를 사용합니다.
+            # 행동 분석은 KS3에서 가져온 전체 이벤트 데이터를 사용합니다.
+            if request.meta and full_events_from_chunks:
+                # print(f"[디버그] 행동 데이터 메타: {request.meta}", file=sys.stderr) # 디버깅용
+                # print(f"[디버그] 행동 이벤트 (KS3에서 로드됨): {full_events_from_chunks}", file=sys.stderr) # 디버깅용
                 behavior_result = behavior_service.run_behavior_verification(
-                    request.meta, request.events)
-                logger.debug(f"행동 분석 결과: {behavior_result}")
+                    request.meta, full_events_from_chunks)
+                print(f"[디버그] 행동 분석 결과: {behavior_result}",
+                      file=sys.stderr)  # 디버깅용
                 if behavior_result and behavior_result.get("ok"):
                     confidence = behavior_result.get("bot_prob")
                     verdict = behavior_result.get("verdict")
-                    logger.debug(
-                        f"할당된 신뢰도: {confidence}, 판정: {verdict}")
+                    # 디버깅용
+                    print(
+                        f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}", file=sys.stderr)
 
             # 7. 세션에 연결된 캡챠 문제의 정답을 가져옵니다.
             correct_answer = session.captchaProblem.answer
             # 8. 사용자가 제출한 답변과 정답을 비교하여 성공 여부를 판단합니다.
+            # 디버깅용
+            print(
+                f"[디버그] 비교 중: request.answer='{request.answer}' (type: {type(request.answer)}), correct_answer='{correct_answer}' (type: {type(correct_answer)})", file=sys.stderr)
             is_correct = request.answer == correct_answer
 
             # 9. 성공 여부에 따라 결과(SUCCESS/FAIL)와 메시지를 설정합니다.
-            # result = CaptchaResult.SUCCESS if is_correct else CaptchaResult.FAIL # Old logic
+            # 디버깅용
+            print(
+                f"[디버그] 비교 중: is_correct={is_correct}, verdict={verdict}", file=sys.stderr)
             if is_correct and verdict == "human":
                 result = CaptchaResult.SUCCESS
                 message = "캡챠 검증에 성공했습니다."
@@ -245,6 +278,7 @@ class CaptchaService:
             return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict=verdict)
 
         except HTTPException as e:
+            # 13. HTTP 예외가 발생한 경우, 데이터베이스 변경사항을 롤백하고 해당 예외를 다시 발생시킵니다.
             self.db.rollback()
             raise e
         except Exception as e:

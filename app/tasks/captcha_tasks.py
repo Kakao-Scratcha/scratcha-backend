@@ -1,7 +1,7 @@
 # app/tasks/captcha_tasks.py
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException
 
@@ -12,96 +12,11 @@ from app.models.captcha_log import CaptchaResult
 from app.schemas.captcha import CaptchaVerificationRequest
 from db.session import SessionLocal
 
-import os
-import json
-import io
-import gzip
-import boto3
-from botocore.config import Config
-from pydantic import BaseModel
+# KS3 유틸리티 함수 임포트
+from app.core.ks3 import upload_entire_session_behavior
 
 # 로거 설정
 logger = logging.getLogger(__name__)
-
-# ===== KS3/S3 helpers (copied from captcha_service.py) =====
-
-
-def model_dump_compat(obj, *, exclude_none: bool = True):
-    if hasattr(obj, "model_dump"):
-        return obj.model_dump(exclude_none=exclude_none)
-    if hasattr(obj, "dict"):
-        return obj.dict(exclude_none=exclude_none)
-    return obj
-
-
-def _ks3_client():
-    cfg = Config(
-        s3={"addressing_style": "path" if settings.KS3_FORCE_PATH_STYLE else "virtual"},
-        signature_version="s3v4",
-        retries={"max_attempts": 3, "mode": "standard"},
-    )
-    session = boto3.session.Session(
-        aws_access_key_id=settings.KS3_ACCESS_KEY,
-        aws_secret_access_key=settings.KS3_SECRET_KEY,
-        region_name=settings.KS3_REGION or "ap-northeast-2",
-    )
-    return session.client("s3", endpoint_url=settings.KS3_ENDPOINT, config=cfg)
-
-
-def _make_session_key(session_id: str, gz: bool = True) -> str:
-    ts = datetime.now(settings.TIMEZONE).strftime("%Y%m%d-%H%M%S")
-    fname = f"{ts}_{session_id}.json" + (".gz" if gz else "")
-    return f"{settings.KS3_PREFIX.strip('/')}/{fname}".strip("/")
-
-
-def _serialize_jsonl_bytes(payload: CaptchaVerificationRequest) -> bytes:
-    meta = model_dump_compat(payload.meta, exclude_none=True)
-    events = [model_dump_compat(e, exclude_none=True) for e in payload.events]
-    lines = [json.dumps({"type": "meta", **meta}, ensure_ascii=False)]
-    for ev in events:
-        lines.append(json.dumps({"type": "event", **ev}, ensure_ascii=False))
-    # Assuming label is not part of CaptchaVerificationRequest for now, or needs to be added
-    # if payload.label:
-    #     lines.append(json.dumps({"type": "label", **payload.label}, ensure_ascii=False))
-    return ("\n".join(lines) + "\n").encode("utf-8")
-
-
-def _gzip_bytes(raw: bytes) -> bytes:
-    buf = io.BytesIO()
-    with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=6, mtime=0) as gz:
-        gz.write(raw)
-    return buf.getvalue()
-
-def upload_ks3_session(payload: CaptchaVerificationRequest, session_id: str):
-    if not settings.ENABLE_KS3 or not settings.KS3_BUCKET or not settings.KS3_ACCESS_KEY or not settings.KS3_SECRET_KEY or not settings.KS3_ENDPOINT:
-        missing = []
-        if not settings.ENABLE_KS3:
-            missing.append("KS3_ENABLE(auto)==False")
-        if not settings.KS3_BUCKET:
-            missing.append("KS3_BUCKET")
-        if not settings.KS3_ACCESS_KEY:
-            missing.append("KS3_ACCESS_KEY")
-        if not settings.KS3_SECRET_KEY:
-            missing.append("KS3_SECRET_KEY")
-        if not settings.KS3_ENDPOINT:
-            missing.append("KS3_ENDPOINT")
-        logger.warning(
-            f"S3 업로드 건너뜀: 설정 누락됨: {', '.join(missing)}")
-        return (None, None, f"Missing: {', '.join(missing)}")
-    try:
-        body = _serialize_jsonl_bytes(payload)
-        gz = _gzip_bytes(body)
-        key = _make_session_key(session_id, gz=True)
-        s3 = _ks3_client()
-        s3.put_object(
-            Bucket=settings.KS3_BUCKET, Key=key, Body=gz,
-            ContentType="application/json", ContentEncoding="gzip",
-        )
-        logger.info(f"KS3 업로드 성공: s3://{settings.KS3_BUCKET}/{key}")
-        return (f"s3://{settings.KS3_BUCKET}/{key}", key, len(gz))
-    except Exception as e:
-        logger.error(f"KS3 업로드 오류: {e}")
-        return (None, None, f"upload error: {e}")
 
 
 @celery_app.task(bind=True)
@@ -176,9 +91,9 @@ def uploadBehaviorDataTask(clientToken: str, request_data: Dict[str, Any]):
     """
     logger.info(f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 중...")
     try:
-        # Reconstruct CaptchaVerificationRequest from dict
+        # 딕셔너리로부터 CaptchaVerificationRequest 재구성
         request = CaptchaVerificationRequest(**request_data)
-        upload_ks3_session(request, clientToken)
+        upload_entire_session_behavior(request, clientToken)
         logger.info(
             f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 성공")
     except Exception as e:
@@ -209,7 +124,7 @@ def cleanupExpiredSessionsTask():
 
         # 타임아웃 기준점을 지났고, 아직 로그(성공/실패/타임아웃)가 없는 세션들을 조회합니다.
         # with_for_update(skip_locked=True)를 사용하여 여러 워커가 동시에 같은 세션을 처리하는 것을 방지합니다.
-        # 이미 다른 워커에 의해 잠긴(처리 중인) 세션은 건너뜁니다.
+        # 이미 다른 워커에 의해 잠긴(처리 중인) 세션은 건너뜜니다.
         expiredSessions = db.query(CaptchaSession).filter(
             CaptchaSession.createdAt < timeoutThreshold,
             ~CaptchaSession.captchaLog.any()

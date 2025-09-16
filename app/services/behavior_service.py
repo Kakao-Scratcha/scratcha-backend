@@ -85,15 +85,17 @@ def get_model() -> Optional[nn.Module]:
             m.load_state_dict(state, strict=True)
             m.eval()
             _MODEL = m
-            logger.info(f"[확인] best.pt 로드 완료: {BEST_PT}")
+            logger.info(f"행동검증모델(best.pt) 로드 완료: {BEST_PT}")
         except Exception as e:
-            logger.warning(f"[경고] best.pt 로드 실패: {e}")
+            logger.warning(f"행동검증모델(best.pt) 로드 실패: {e}")
             _MODEL = None
         return _MODEL
+
 
 # ====== Calibration (temperature / platt) ======
 _CALIB = None
 _CALIB_MTIME = None
+
 
 def _load_calibration():
     """
@@ -120,6 +122,7 @@ def _load_calibration():
         _CALIB_MTIME = None
     return _CALIB
 
+
 # ====== Temperature scaling =====
 LOGIT_TEMPERATURE = float(os.getenv("LOGIT_TEMPERATURE", "2.0"))
 
@@ -130,7 +133,8 @@ LOGIT_TEMPERATURE = float(os.getenv("LOGIT_TEMPERATURE", "2.0"))
 
 def _to_rect(d):
     try:
-        L, T, W, H = float(d.get("left")), float(d.get("top")), float(d.get("w")), float(d.get("h"))
+        L, T, W, H = float(d.get("left")), float(
+            d.get("top")), float(d.get("w")), float(d.get("h"))
         if W <= 0 or H <= 0:
             return None
         return (L, T, W, H)
@@ -162,14 +166,21 @@ def _roi_rects(meta: Any) -> Tuple[Optional[Tuple[float, float, float, float]], 
 def _flatten_events(meta: Any, events: List[Any]):
     out = []
     for ev in events:
-        et = getattr(ev, "type", None) or (ev.get("type") if isinstance(ev, dict) else None)
+        et = getattr(ev, "type", None) or (
+            ev.get("type") if isinstance(ev, dict) else None)
         if et in ("moves", "moves_free"):
-            p = getattr(ev, "payload", None) or (ev.get("payload") if isinstance(ev, dict) else None)
-            if not p: continue
-            base = int(getattr(p, "base_t", 0) or (p.get("base_t") if isinstance(p, dict) else 0) or 0)
-            dts  = list(getattr(p, "dts", []) or (p.get("dts") if isinstance(p, dict) else []) or [])
-            xs   = list(getattr(p, "xrs", []) or (p.get("xrs") if isinstance(p, dict) else []) or [])
-            ys   = list(getattr(p, "yrs", []) or (p.get("yrs") if isinstance(p, dict) else []) or [])
+            p = getattr(ev, "payload", None) or (
+                ev.get("payload") if isinstance(ev, dict) else None)
+            if not p:
+                continue
+            base = int(getattr(p, "base_t", 0) or (
+                p.get("base_t") if isinstance(p, dict) else 0) or 0)
+            dts = list(getattr(p, "dts", []) or (
+                p.get("dts") if isinstance(p, dict) else []) or [])
+            xs = list(getattr(p, "xrs", []) or (
+                p.get("xrs") if isinstance(p, dict) else []) or [])
+            ys = list(getattr(p, "yrs", []) or (
+                p.get("yrs") if isinstance(p, dict) else []) or [])
             t = base
             n = min(len(dts), len(xs), len(ys))
             for i in range(n):
@@ -177,10 +188,14 @@ def _flatten_events(meta: Any, events: List[Any]):
                 dt = int(dts[i]) if int(dts[i]) > 0 else 1
                 t += dt
         elif et in ("pointerdown", "pointerup", "click"):
-            t  = (getattr(ev, "t", None) if not isinstance(ev, dict) else ev.get("t"))
-            xr = (getattr(ev, "x_raw", None) if not isinstance(ev, dict) else ev.get("x_raw"))
-            yr = (getattr(ev, "y_raw", None) if not isinstance(ev, dict) else ev.get("y_raw"))
-            if t is None or xr is None or yr is None: continue
+            t = (getattr(ev, "t", None) if not isinstance(
+                ev, dict) else ev.get("t"))
+            xr = (getattr(ev, "x_raw", None) if not isinstance(
+                ev, dict) else ev.get("x_raw"))
+            yr = (getattr(ev, "y_raw", None) if not isinstance(
+                ev, dict) else ev.get("y_raw"))
+            if t is None or xr is None or yr is None:
+                continue
             out.append((int(t), float(xr), float(yr)))
     out.sort(key=lambda x: x[0])
     logger.debug(f"_flatten_events 결과: {len(out)}개의 포인트, 첫 5개: {out[:5]}")
@@ -215,6 +230,7 @@ def _time_scale_to_ms(t: np.ndarray) -> Tuple[np.ndarray, str]:
         idx = np.arange(len(t), dtype=np.float64)
         return idx * 16.0, "time_reindexed_16ms"
     return t, "time_ms_fallback"
+
 
 def _norm_xy(x_raw: float, y_raw: float, rect: Tuple[float, float, float, float]):
     L, T, W, H = rect
@@ -266,7 +282,7 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
     oobs_canvas = np.asarray(oobs_canvas, dtype=np.float32)
     oobs_wrap = np.asarray(oobs_wrap, dtype=np.float32)
     ts = np.asarray(ts, dtype=np.float64)
-    ts, _ = _time_scale_to_ms(ts) # 2) 시간 보정(ms)
+    ts, _ = _time_scale_to_ms(ts)  # 2) 시간 보정(ms)
 
     # 3) dt (sec)
     dt_ms = np.diff(ts, prepend=ts[0])

@@ -1,10 +1,11 @@
-# schemas/captcha.py
+# app/schemas/captcha.py
 
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional, Dict, Any
 
 
 class CaptchaProblemResponse(BaseModel):
+    """새로운 캡챠 문제 요청에 대한 응답 스키마입니다."""
     clientToken: str = Field(
         ...,
         description="캡챠 문제 해결을 위한 고유 클라이언트 토큰",
@@ -25,12 +26,18 @@ class CaptchaProblemResponse(BaseModel):
         description="사용자가 선택할 수 있는 옵션 목록",
         example=["고양이", "강아지", "새", "물고기"]
     )
+    correctAnswer: Optional[str] = Field(
+        None,
+        description="테스트 환경에서만 제공되는 캡챠 정답. 운영 환경에서는 항상 None입니다.",
+        example="고양이"
+    )
 
     class Config:
         from_attributes = True
 
 
 class CaptchaVerificationRequest(BaseModel):
+    """캡챠 답변 검증 요청 스키마입니다."""
     answer: str = Field(
         ...,
         description="사용자가 선택한 정답",
@@ -58,6 +65,7 @@ class CaptchaVerificationRequest(BaseModel):
 
 
 class CaptchaVerificationResponse(BaseModel):
+    """캡챠 답변 검증 결과 응답 스키마입니다."""
     result: Literal["success", "fail", "timeout"] = Field(
         ...,
         description="캡챠 검증 결과 (성공, 실패, 시간 초과)",
@@ -81,6 +89,7 @@ class CaptchaVerificationResponse(BaseModel):
 
 
 class CaptchaTaskResponse(BaseModel):
+    """비동기 캡챠 검증 작업의 결과 조회 스키마입니다."""
     taskId: str = Field(
         ...,
         description="비동기 캡챠 검증 작업의 고유 ID",

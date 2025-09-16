@@ -6,6 +6,7 @@ load_dotenv()  # .env 파일에서 환경 변수를 로드합니다.
 
 
 class Settings:
+    ENV = "test"
     # 시간대 설정
     TIMEZONE = timezone("Asia/Seoul")
 

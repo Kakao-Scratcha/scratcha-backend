@@ -2,10 +2,11 @@ from fastapi import FastAPI, Request, status, HTTPException
 import logging.config
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
+from typing import Callable, Awaitable
 
 
 from db.session import engine
@@ -17,11 +18,11 @@ from app.core.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup event
+    # 애플리케이션 시작 이벤트
     print("로깅 설정 적용...")
     logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
     yield
-    # Shutdown event
+    # 애플리케이션 종료 이벤트
     print("데이터베이스 연결 풀 해제...")
     engine.dispose()
     print("애플리케이션 종료.")
@@ -29,7 +30,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Dashboard API",
     description="scratCHA API 서버",
-    lifespan=lifespan  # Add lifespan to FastAPI app
+    lifespan=lifespan  # FastAPI 앱에 lifespan 추가
 )
 
 # Prometheus 메트릭을 설정합니다.
@@ -113,6 +114,28 @@ def read_root():
 
 
 # 라우터 등록
+from app.routers import events_router
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """요청 본문 크기를 제한하는 미들웨어입니다."""
+    def __init__(self, app: FastAPI, max_size: int):
+        super().__init__(app)
+        self.max_size = max_size
+
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        content_length = request.headers.get('content-length')
+        if content_length and int(content_length) > self.max_size:
+            return JSONResponse(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                content={'detail': f'요청 본문 크기가 너무 큽니다. 제한은 {self.max_size} 바이트입니다.'}
+            )
+        response = await call_next(request)
+        return response
+
+# 10MB 요청 크기 제한 미들웨어 추가
+app.add_middleware(RequestSizeLimitMiddleware, max_size=10 * 1024 * 1024)
+
 app.include_router(users_router.router, prefix="/api/dashboard")
 app.include_router(auth_router.router, prefix="/api/dashboard")
 app.include_router(application_router.router, prefix="/api/dashboard")
@@ -121,3 +144,4 @@ app.include_router(usage_stats_router.router, prefix="/api/dashboard")
 app.include_router(captcha_router.router, prefix="/api")
 app.include_router(payment_router.router, prefix="/api")
 app.include_router(contact_router.router, prefix="/api")
+app.include_router(events_router.router, prefix="/api")
