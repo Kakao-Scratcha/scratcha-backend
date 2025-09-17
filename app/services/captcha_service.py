@@ -20,120 +20,12 @@ from app.repositories.usage_stats_repo import UsageStatsRepository
 from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationRequest, CaptchaVerificationResponse
 from app.models.captcha_log import CaptchaResult
 from app.services import behavior_service
+from app.services.rule_check_service import RuleCheckService
+
 from app.core.ks3 import download_behavior_chunks
 from app.models.captcha_session import CaptchaSession  # Import CaptchaSession
 
 logger = logging.getLogger(__name__)
-
-
-class RuleCheckService:
-    def __init__(self, db: Session, captcha_repo: CaptchaRepository, usage_stats_repo: UsageStatsRepository):
-        self.db = db
-        self.captchaRepo = captcha_repo
-        self.usageStatsRepo = usage_stats_repo
-
-    def check_time_constraint(self, session: CaptchaSession, latency: timedelta) -> Optional[CaptchaVerificationResponse]:
-        if latency < timedelta(seconds=1.5):
-            logger.info(
-                f"[디버그] 너무 빠른 캡챠 시도 감지. clientToken: {session.clientToken}, latency: {latency}")
-            self.captchaRepo.createCaptchaLog(
-                session=session,
-                result=CaptchaResult.FAIL,
-                latency_ms=int(latency.total_seconds() * 1000),
-                is_correct=False,
-                ml_confidence=None,
-                ml_is_bot=None
-            )
-            self.usageStatsRepo.incrementVerificationResult(
-                session.keyId, CaptchaResult.FAIL.value, int(latency.total_seconds() * 1000))
-            self.db.commit()
-            return CaptchaVerificationResponse(result="fail", message="너무 빠르게 캡챠를 시도했습니다.")
-        return None
-
-    def check_oob_ratio(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
-        oob_ratio = behavior_result.get("stats", {}).get("oob_rate_wrapper")
-        if oob_ratio is not None and oob_ratio >= 1.0:
-            logger.info(
-                f"[디버그] OOB 비율 100% 감지. clientToken: {session.clientToken}, oob_ratio: {oob_ratio}")
-            result = CaptchaResult.FAIL
-            message = "행동 데이터 OOB 비율이 100%입니다. 캡챠 검증에 실패했습니다."
-            self.captchaRepo.createCaptchaLog(
-                session=session,
-                result=result,
-                latency_ms=int(latency.total_seconds() * 1000),
-                is_correct=False,
-                ml_confidence=confidence,
-                ml_is_bot=True
-            )
-            self.usageStatsRepo.incrementVerificationResult(
-                session.keyId, result.value, int(latency.total_seconds() * 1000))
-            self.db.commit()
-            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
-        return None
-
-    def check_event_count(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
-        n_events = behavior_result.get("stats", {}).get("n_events")
-        if n_events is not None and n_events < 20:
-            logger.info(
-                f"[디버그] 이벤트 수가 너무 적음. clientToken: {session.clientToken}, n_events: {n_events}")
-            result = CaptchaResult.FAIL
-            message = "유효한 행동 데이터가 부족합니다. 캡챠 검증에 실패했습니다."
-            self.captchaRepo.createCaptchaLog(
-                session=session,
-                result=result,
-                latency_ms=int(latency.total_seconds() * 1000),
-                is_correct=False,
-                ml_confidence=confidence,
-                ml_is_bot=True
-            )
-            self.usageStatsRepo.incrementVerificationResult(
-                session.keyId, result.value, int(latency.total_seconds() * 1000))
-            self.db.commit()
-            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
-        return None
-
-    def check_mean_speed(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
-        mean_speed = behavior_result.get("stats", {}).get("speed_mean")
-
-        # Check for no movement at all
-        if mean_speed is not None and mean_speed == 0 and behavior_result.get("stats", {}).get("n_events", 0) > 1:
-            logger.info(
-                f"[디버그] 평균 속도 0 감지. clientToken: {session.clientToken}, mean_speed: {mean_speed}")
-            result = CaptchaResult.FAIL
-            message = "유효한 움직임이 감지되지 않았습니다."
-            self.captchaRepo.createCaptchaLog(
-                session=session,
-                result=result,
-                latency_ms=int(latency.total_seconds() * 1000),
-                is_correct=False,
-                ml_confidence=confidence,
-                ml_is_bot=True
-            )
-            self.usageStatsRepo.incrementVerificationResult(
-                session.keyId, result.value, int(latency.total_seconds() * 1000))
-            self.db.commit()
-            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
-
-        # Check for extremely high average speed (e.g., > 3000 pixels/sec)
-        if mean_speed is not None and mean_speed > 3000:
-            logger.info(
-                f"[디버그] 비정상적인 평균 속도 감지. clientToken: {session.clientToken}, mean_speed: {mean_speed}")
-            result = CaptchaResult.FAIL
-            message = "비정상적인 움직임이 감지되었습니다."
-            self.captchaRepo.createCaptchaLog(
-                session=session,
-                result=result,
-                latency_ms=int(latency.total_seconds() * 1000),
-                is_correct=False,
-                ml_confidence=confidence,
-                ml_is_bot=True
-            )
-            self.usageStatsRepo.incrementVerificationResult(
-                session.keyId, result.value, int(latency.total_seconds() * 1000))
-            self.db.commit()
-            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
-
-        return None
 
 
 class CaptchaService:
@@ -306,11 +198,11 @@ class CaptchaService:
             rule_checker = RuleCheckService(
                 self.db, self.captchaRepo, UsageStatsRepository(self.db))
 
-            # Apply time constraint check
-            # time_check_result = rule_checker.check_time_constraint(
-            #     session, latency)
-            # if time_check_result:
-            #     return time_check_result
+            # Apply time constraint check (existing)
+            time_check_result = rule_checker.check_time_constraint(
+                session, latency)
+            if time_check_result:
+                return time_check_result
 
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
@@ -343,8 +235,6 @@ class CaptchaService:
             # request.meta는 verify 요청에 포함된 메타데이터를 사용합니다.
             # 행동 분석은 KS3에서 가져온 전체 이벤트 데이터를 사용합니다.
             if session_meta and full_events_from_chunks:
-                # logger.info(f"[디버그] 행동 데이터 메타: {request.meta}") # 디버깅용
-                # logger.info(f"[디버그] 행동 이벤트 (KS3에서 로드됨): {full_events_from_chunks}") # 디버깅용
                 behavior_result = behavior_service.run_behavior_verification(
                     session_meta, full_events_from_chunks)
                 logger.info(f"[디버그] 행동 분석 결과: {behavior_result}")  # 디버깅용
@@ -352,23 +242,15 @@ class CaptchaService:
                     confidence = behavior_result.get("bot_prob")
                     verdict = behavior_result.get("verdict")
 
-                    # Apply OOB ratio check
-                    oob_check_result = rule_checker.check_oob_ratio(
+                    no_scratching_check_result = rule_checker.check_no_scratching(
                         session, latency, behavior_result, confidence)
-                    if oob_check_result:
-                        return oob_check_result
+                    if no_scratching_check_result:
+                        return no_scratching_check_result
 
-                    # Apply event count check
-                    event_count_check_result = rule_checker.check_event_count(
+                    no_mouse_movement_check_result = rule_checker.check_no_mouse_movement(
                         session, latency, behavior_result, confidence)
-                    if event_count_check_result:
-                        return event_count_check_result
-
-                    # Apply mean speed check
-                    mean_speed_check_result = rule_checker.check_mean_speed(
-                        session, latency, behavior_result, confidence)
-                    if mean_speed_check_result:
-                        return mean_speed_check_result
+                    if no_mouse_movement_check_result:
+                        return no_mouse_movement_check_result
 
                     # 디버깅용
                     logger.info(
