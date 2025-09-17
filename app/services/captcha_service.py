@@ -307,10 +307,10 @@ class CaptchaService:
                 self.db, self.captchaRepo, UsageStatsRepository(self.db))
 
             # Apply time constraint check
-            time_check_result = rule_checker.check_time_constraint(
-                session, latency)
-            if time_check_result:
-                return time_check_result
+            # time_check_result = rule_checker.check_time_constraint(
+            #     session, latency)
+            # if time_check_result:
+            #     return time_check_result
 
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
