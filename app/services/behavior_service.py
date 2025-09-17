@@ -252,15 +252,16 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
     rect_track, rect_oob = _roi_rects(meta)
     if rect_track is None:
         logger.info(
-            f"build_window_7ch: rect_track이 None이므로 전처리 건너뜀. meta: {meta}")
-        # 🔒 canvas가 없으면 모델 입력을 만들지 않음(폴백 금지)
-        return None, 0, False, (rect_oob is not None), 0.0, 0.0
+            f"build_window_7ch: rect_track이 None이므로 전처리 건너뛰기. meta: {meta}")
+        return None, 0, False, (rect_oob is not None), 0.0, 0.0, 0.0, False
+
+    has_move_events = any(ev.get("type") in ("moves", "moves_free") for ev in events)
 
     pts = _flatten_events(meta, events)
     if not pts:
         logger.info(
-            f"build_window_7ch: 평탄화된 이벤트(pts)가 없으므로 전처리 건너뜀. events: {events}")
-        return None, 0, True, (rect_oob is not None), 0.0, 0.0
+            f"build_window_7ch: 평탄화된 이벤트(pts)가 없으므로 전처리 건너뛰기. events: {events}")
+        return None, 0, True, (rect_oob is not None), 0.0, 0.0, 0.0, has_move_events
 
     # 1) 정규화 + OOB (canvas 기준)
     xs, ys, oobs_canvas, oobs_wrap, ts = [], [], [], [], []
@@ -325,10 +326,10 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
                             ) if oobs_canvas.size else 0.0
     oob_wrapper_rate = float(np.mean(oobs_wrap > 0.5)
                              ) if oobs_wrap.size else 0.0
-    return X, raw_len, True, (rect_oob is not None), oob_canvas_rate, oob_wrapper_rate, total_distance
+    return X, raw_len, True, (rect_oob is not None), oob_canvas_rate, oob_wrapper_rate, total_distance, has_move_events
 
 
-def seq_stats(X, raw_len: int, has_track: bool, has_wrap: bool, oob_canvas_rate: float, oob_wrap_rate: float, total_distance: float):
+def seq_stats(X, raw_len: int, has_track: bool, has_wrap: bool, oob_canvas_rate: float, oob_wrap_rate: float, total_distance: float, has_move_events: bool):
     if X is None or X.size == 0:
         return {
             "oob_rate_canvas": 0.0,
@@ -346,6 +347,7 @@ def seq_stats(X, raw_len: int, has_track: bool, has_wrap: bool, oob_canvas_rate:
         "roi_has_canvas": has_track,
         "roi_has_wrapper": has_wrap,
         "total_distance": total_distance,
+        "has_move_events": has_move_events,
     }
 
 # ====== Inference Entrypoint ======
@@ -358,7 +360,7 @@ def run_behavior_verification(meta: Dict[str, Any], events: List[Dict[str, Any]]
         return {"ok": False, "error": "model not loaded"}
 
     # (전처리)
-    X, raw_len, has_track, has_wrap, oob_c, oob_w, total_distance = build_window_7ch(
+    X, raw_len, has_track, has_wrap, oob_c, oob_w, total_distance, has_move_events = build_window_7ch(
         meta, events, T=300)
     if X is None:
         logger.info("특징 추출 결과가 None입니다. 추론을 건너뜁니다.")
@@ -395,5 +397,5 @@ def run_behavior_verification(meta: Dict[str, Any], events: List[Dict[str, Any]]
         "bot_prob": prob,
         "threshold": thr,
         "verdict": verdict,
-        "stats": seq_stats(X, raw_len, has_track, has_wrap, oob_c, oob_w, total_distance),
+        "stats": seq_stats(X, raw_len, has_track, has_wrap, oob_c, oob_w, total_distance, has_move_events),
     }

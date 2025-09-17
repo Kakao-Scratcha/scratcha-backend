@@ -40,12 +40,11 @@ class RuleCheckService:
         return None
 
     def check_no_scratching(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
-        n_events = behavior_result.get("stats", {}).get("n_events", 0)
-        total_distance = behavior_result.get("stats", {}).get("total_distance", 0)
+        has_move_events = behavior_result.get("stats", {}).get("has_move_events", False)
 
-        if n_events < 5 or total_distance < 10: # Thresholds can be adjusted
+        if not has_move_events:
             logger.info(
-                f"[디버그] 스크래치 없이 정답 클릭 감지. clientToken: {session.clientToken}, n_events: {n_events}, total_distance: {total_distance}")
+                f"[디버그] 스크래치 없이 정답 클릭 감지. clientToken: {session.clientToken}, has_move_events: {has_move_events}")
             result = CaptchaResult.FAIL
             message = "스크래치 없이 정답을 클릭했습니다."
             self.captchaRepo.createCaptchaLog(
