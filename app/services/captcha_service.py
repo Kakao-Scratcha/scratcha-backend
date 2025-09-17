@@ -51,7 +51,7 @@ class RuleCheckService:
         return None
 
     def check_oob_ratio(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
-        oob_ratio = behavior_result.get("oob_ratio")
+        oob_ratio = behavior_result.get("stats", {}).get("oob_rate_wrapper")
         if oob_ratio is not None and oob_ratio >= 1.0:
             logger.info(
                 f"[디버그] OOB 비율 100% 감지. clientToken: {session.clientToken}, oob_ratio: {oob_ratio}")
@@ -69,6 +69,70 @@ class RuleCheckService:
                 session.keyId, result.value, int(latency.total_seconds() * 1000))
             self.db.commit()
             return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
+        return None
+
+    def check_event_count(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
+        n_events = behavior_result.get("stats", {}).get("n_events")
+        if n_events is not None and n_events < 5:
+            logger.info(
+                f"[디버그] 이벤트 수가 너무 적음. clientToken: {session.clientToken}, n_events: {n_events}")
+            result = CaptchaResult.FAIL
+            message = "유효한 행동 데이터가 부족합니다. 캡챠 검증에 실패했습니다."
+            self.captchaRepo.createCaptchaLog(
+                session=session,
+                result=result,
+                latency_ms=int(latency.total_seconds() * 1000),
+                is_correct=False,
+                ml_confidence=confidence,
+                ml_is_bot=True
+            )
+            self.usageStatsRepo.incrementVerificationResult(
+                session.keyId, result.value, int(latency.total_seconds() * 1000))
+            self.db.commit()
+            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
+        return None
+
+    def check_mean_speed(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
+        mean_speed = behavior_result.get("stats", {}).get("speed_mean")
+        
+        # Check for no movement at all
+        if mean_speed is not None and mean_speed == 0 and behavior_result.get("stats", {}).get("n_events", 0) > 1:
+            logger.info(
+                f"[디버그] 평균 속도 0 감지. clientToken: {session.clientToken}, mean_speed: {mean_speed}")
+            result = CaptchaResult.FAIL
+            message = "유효한 움직임이 감지되지 않았습니다."
+            self.captchaRepo.createCaptchaLog(
+                session=session,
+                result=result,
+                latency_ms=int(latency.total_seconds() * 1000),
+                is_correct=False,
+                ml_confidence=confidence,
+                ml_is_bot=True
+            )
+            self.usageStatsRepo.incrementVerificationResult(
+                session.keyId, result.value, int(latency.total_seconds() * 1000))
+            self.db.commit()
+            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
+        
+        # Check for extremely high average speed (e.g., > 3000 pixels/sec)
+        if mean_speed is not None and mean_speed > 3000:
+            logger.info(
+                f"[디버그] 비정상적인 평균 속도 감지. clientToken: {session.clientToken}, mean_speed: {mean_speed}")
+            result = CaptchaResult.FAIL
+            message = "비정상적인 움직임이 감지되었습니다."
+            self.captchaRepo.createCaptchaLog(
+                session=session,
+                result=result,
+                latency_ms=int(latency.total_seconds() * 1000),
+                is_correct=False,
+                ml_confidence=confidence,
+                ml_is_bot=True
+            )
+            self.usageStatsRepo.incrementVerificationResult(
+                session.keyId, result.value, int(latency.total_seconds() * 1000))
+            self.db.commit()
+            return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
+
         return None
 
 
@@ -232,11 +296,6 @@ class CaptchaService:
                     detail="이미 검증된 토큰입니다."
                 )
 
-            # 행동 데이터 업로드를 비동기 작업으로 처리
-            # 이 시점의 request.dict()는 events가 비어있을 수 있습니다.
-            if settings.ENABLE_KS3:
-                uploadBehaviorDataTask.delay(clientToken)
-
             if session.createdAt.tzinfo is None:
                 session.createdAt = settings.TIMEZONE.localize(
                     session.createdAt)
@@ -252,6 +311,8 @@ class CaptchaService:
                 session, latency)
             if time_check_result:
                 return time_check_result
+
+            
 
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
@@ -299,6 +360,18 @@ class CaptchaService:
                     if oob_check_result:
                         return oob_check_result
 
+                    # Apply event count check
+                    event_count_check_result = rule_checker.check_event_count(
+                        session, latency, behavior_result, confidence)
+                    if event_count_check_result:
+                        return event_count_check_result
+
+                    # Apply mean speed check
+                    mean_speed_check_result = rule_checker.check_mean_speed(
+                        session, latency, behavior_result, confidence)
+                    if mean_speed_check_result:
+                        return mean_speed_check_result
+
                     # 디버깅용
                     logger.info(
                         f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}")
@@ -318,6 +391,9 @@ class CaptchaService:
             if is_correct and verdict == "human":
                 result = CaptchaResult.SUCCESS
                 message = "캡챠 검증에 성공했습니다."
+                # 성공한 경우에만 행동 데이터를 업로드합니다.
+                if settings.ENABLE_KS3:
+                    uploadBehaviorDataTask.delay(clientToken)
             elif is_correct and verdict != "human":
                 result = CaptchaResult.FAIL
                 message = "행동검증에 실패했습니다."
@@ -326,13 +402,14 @@ class CaptchaService:
                 message = "캡챠 검증에 실패했습니다."
 
             # 10. 검증 결과를 로그에 기록합니다.
+            ml_is_bot = True if verdict == "bot" else False
             self.captchaRepo.createCaptchaLog(
                 session=session,
                 result=result,
                 latency_ms=int(latency.total_seconds() * 1000),
                 is_correct=is_correct,
-                ml_confidence=None,
-                ml_is_bot=None
+                ml_confidence=confidence,
+                ml_is_bot=ml_is_bot
             )
 
             # 11. API 키 사용 통계에 검증 결과를 업데이트합니다.

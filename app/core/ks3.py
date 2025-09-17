@@ -80,7 +80,7 @@ def upload_behavior_chunk(chunk: EventChunk):
             ContentType="application/json",
             ContentEncoding="gzip",
         )
-        logger.info(f"KS3에 청크 업로드 성공: s3://{settings.KS3_BUCKET}/{key}")
+        logger.info(f"KS3에 청크 업로드 성공: {settings.KS3_BUCKET}/{key}")
 
     except Exception as e:
         logger.error(f"클라이언트 토큰 {chunk.client_token}에 대한 청크 KS3 업로드 실패: {e}")
@@ -107,8 +107,7 @@ def upload_entire_session_behavior(meta: Dict[str, Any], events: List[Dict[str, 
         gzipped_body = _gzip_bytes(body)
 
         ts = datetime.now(settings.TIMEZONE).strftime("%Y%m%d-%H%M%S")
-        # 경로를 behavior-chunks/{client_token}/full_session_{ts}.json.gz 형식으로 변경
-        key = f"behavior-chunks/{client_token}/full_session_{ts}.json.gz"
+        key = f"behavior-verify/{client_token}/{ts}.json.gz"
 
         s3_client.put_object(
             Bucket=settings.KS3_BUCKET,
@@ -117,11 +116,11 @@ def upload_entire_session_behavior(meta: Dict[str, Any], events: List[Dict[str, 
             ContentType="application/json",
             ContentEncoding="gzip",
         )
-        logger.info(f"KS3에 세션 데이터 업로드 성공: s3://{settings.KS3_BUCKET}/{key}")
-        return (f"s3://{settings.KS3_BUCKET}/{key}", key, len(gzipped_body))
+        logger.info(f"KS3에 병합된 행동데이터 업로드 성공: {settings.KS3_BUCKET}/{key}")
+        return (f"{settings.KS3_BUCKET}/{key}", key, len(gzipped_body))
 
     except Exception as e:
-        logger.error(f"클라이언트 토큰 {client_token}에 대한 세션 데이터 KS3 업로드 실패: {e}")
+        logger.error(f"클라이언트 토큰 {client_token}에 대한 병합된 행동데이터 KS3 업로드 실패: {e}")
         return (None, None, f"업로드 오류: {e}")
 
 

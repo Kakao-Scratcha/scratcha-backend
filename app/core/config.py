@@ -33,7 +33,15 @@ class Settings:
     CAPTCHA_TIMEOUT_MINUTES: int = 3
 
     # 데이터베이스 URL
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
+    MYSQL_USER: str = os.getenv("MYSQL_USER")
+    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD")
+    MYSQL_HOST: str = os.getenv("MYSQL_HOST")
+    MYSQL_PORT: str = os.getenv("MYSQL_PORT")
+    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE")
+    DATABASE_URL: str = (
+        f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
+        f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT')}/{os.getenv('MYSQL_DATABASE')}"
+    )
 
     # 사용자 이름 정규식 패턴
     USER_NAME_REGEX_PATTERN: str = r"^[가-힣a-zA-Z0-9._-]+$"
