@@ -324,7 +324,7 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
                             ) if oobs_canvas.size else 0.0
     oob_wrapper_rate = float(np.mean(oobs_wrap > 0.5)
                              ) if oobs_wrap.size else 0.0
-    return X, raw_len, True, (rect_oob is not None), oob_canvas_rate, oob_wrapper_rate, total_distance, has_move_events
+    return X, raw_len, True, (rect_oob is not None), oob_canvas_rate, oob_wrapper_rate, total_distance
 
 
 def seq_stats(X, raw_len: int, has_track: bool, has_wrap: bool, oob_canvas_rate: float, oob_wrap_rate: float, total_distance: float):
