@@ -21,9 +21,10 @@ from app.schemas.captcha import CaptchaProblemResponse, CaptchaVerificationReque
 from app.models.captcha_log import CaptchaResult
 from app.services import behavior_service
 from app.core.ks3 import download_behavior_chunks
-from app.models.captcha_session import CaptchaSession # Import CaptchaSession
+from app.models.captcha_session import CaptchaSession  # Import CaptchaSession
 
 logger = logging.getLogger(__name__)
+
 
 class RuleCheckService:
     def __init__(self, db: Session, captcha_repo: CaptchaRepository, usage_stats_repo: UsageStatsRepository):
@@ -33,7 +34,8 @@ class RuleCheckService:
 
     def check_time_constraint(self, session: CaptchaSession, latency: timedelta) -> Optional[CaptchaVerificationResponse]:
         if latency < timedelta(seconds=1.5):
-            logger.info(f"[디버그] 너무 빠른 캡챠 시도 감지. clientToken: {session.clientToken}, latency: {latency}")
+            logger.info(
+                f"[디버그] 너무 빠른 캡챠 시도 감지. clientToken: {session.clientToken}, latency: {latency}")
             self.captchaRepo.createCaptchaLog(
                 session=session,
                 result=CaptchaResult.FAIL,
@@ -51,7 +53,8 @@ class RuleCheckService:
     def check_oob_ratio(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
         oob_ratio = behavior_result.get("oob_ratio")
         if oob_ratio is not None and oob_ratio >= 1.0:
-            logger.info(f"[디버그] OOB 비율 100% 감지. clientToken: {session.clientToken}, oob_ratio: {oob_ratio}")
+            logger.info(
+                f"[디버그] OOB 비율 100% 감지. clientToken: {session.clientToken}, oob_ratio: {oob_ratio}")
             result = CaptchaResult.FAIL
             message = "행동 데이터 OOB 비율이 100%입니다. 캡챠 검증에 실패했습니다."
             self.captchaRepo.createCaptchaLog(
@@ -67,6 +70,7 @@ class RuleCheckService:
             self.db.commit()
             return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
         return None
+
 
 class CaptchaService:
     """캡챠 문제 생성 및 검증과 관련된 비즈니스 로직을 처리하는 서비스 클래스입니다."""
@@ -238,12 +242,14 @@ class CaptchaService:
                     session.createdAt)
 
             latency = datetime.now(settings.TIMEZONE) - session.createdAt
-            
+
             # Instantiate RuleCheckService
-            rule_checker = RuleCheckService(self.db, self.captchaRepo, UsageStatsRepository(self.db))
+            rule_checker = RuleCheckService(
+                self.db, self.captchaRepo, UsageStatsRepository(self.db))
 
             # Apply time constraint check
-            time_check_result = rule_checker.check_time_constraint(session, latency)
+            time_check_result = rule_checker.check_time_constraint(
+                session, latency)
             if time_check_result:
                 return time_check_result
 
@@ -282,14 +288,14 @@ class CaptchaService:
                 # logger.info(f"[디버그] 행동 이벤트 (KS3에서 로드됨): {full_events_from_chunks}") # 디버깅용
                 behavior_result = behavior_service.run_behavior_verification(
                     session_meta, full_events_from_chunks)
-                logger.info(f"[디버그] 행동 분석 결과: {behavior_result}",
-                            )  # 디버깅용
+                logger.info(f"[디버그] 행동 분석 결과: {behavior_result}")  # 디버깅용
                 if behavior_result and behavior_result.get("ok"):
                     confidence = behavior_result.get("bot_prob")
                     verdict = behavior_result.get("verdict")
 
                     # Apply OOB ratio check
-                    oob_check_result = rule_checker.check_oob_ratio(session, latency, behavior_result, confidence)
+                    oob_check_result = rule_checker.check_oob_ratio(
+                        session, latency, behavior_result, confidence)
                     if oob_check_result:
                         return oob_check_result
 
@@ -312,6 +318,9 @@ class CaptchaService:
             if is_correct and verdict == "human":
                 result = CaptchaResult.SUCCESS
                 message = "캡챠 검증에 성공했습니다."
+            elif is_correct and verdict != "human":
+                result = CaptchaResult.FAIL
+                message = "행동검증에 실패했습니다."
             else:
                 result = CaptchaResult.FAIL
                 message = "캡챠 검증에 실패했습니다."
