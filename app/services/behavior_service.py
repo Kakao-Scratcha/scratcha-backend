@@ -308,6 +308,11 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
                  axis=1).astype(np.float32)
     raw_len = X.shape[0]
 
+    # Calculate total distance
+    total_distance = 0.0
+    if raw_len > 1:
+        total_distance = float(np.sum(np.sqrt(np.diff(xs)**2 + np.diff(ys)**2)))
+
     # 6) 길이 정규화
     if raw_len < T:
         X = np.concatenate(
@@ -320,10 +325,10 @@ def build_window_7ch(meta: Any, events: List[Any], T: int = 300):
                             ) if oobs_canvas.size else 0.0
     oob_wrapper_rate = float(np.mean(oobs_wrap > 0.5)
                              ) if oobs_wrap.size else 0.0
-    return X, raw_len, True, (rect_oob is not None), oob_canvas_rate, oob_wrapper_rate
+    return X, raw_len, True, (rect_oob is not None), oob_canvas_rate, oob_wrapper_rate, total_distance
 
 
-def seq_stats(X, raw_len: int, has_track: bool, has_wrap: bool, oob_canvas_rate: float, oob_wrap_rate: float):
+def seq_stats(X, raw_len: int, has_track: bool, has_wrap: bool, oob_canvas_rate: float, oob_wrap_rate: float, total_distance: float):
     if X is None or X.size == 0:
         return {
             "oob_rate_canvas": 0.0,
@@ -340,6 +345,7 @@ def seq_stats(X, raw_len: int, has_track: bool, has_wrap: bool, oob_canvas_rate:
         "n_events": int(raw_len),
         "roi_has_canvas": has_track,
         "roi_has_wrapper": has_wrap,
+        "total_distance": total_distance,
     }
 
 # ====== Inference Entrypoint ======
@@ -352,7 +358,7 @@ def run_behavior_verification(meta: Dict[str, Any], events: List[Dict[str, Any]]
         return {"ok": False, "error": "model not loaded"}
 
     # (전처리)
-    X, raw_len, has_track, has_wrap, oob_c, oob_w = build_window_7ch(
+    X, raw_len, has_track, has_wrap, oob_c, oob_w, total_distance = build_window_7ch(
         meta, events, T=300)
     if X is None:
         logger.info("특징 추출 결과가 None입니다. 추론을 건너뜁니다.")
@@ -389,5 +395,5 @@ def run_behavior_verification(meta: Dict[str, Any], events: List[Dict[str, Any]]
         "bot_prob": prob,
         "threshold": thr,
         "verdict": verdict,
-        "stats": seq_stats(X, raw_len, has_track, has_wrap, oob_c, oob_w),
+        "stats": seq_stats(X, raw_len, has_track, has_wrap, oob_c, oob_w, total_distance),
     }
