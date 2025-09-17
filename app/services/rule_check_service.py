@@ -40,11 +40,15 @@ class RuleCheckService:
         return None
 
     def check_no_scratching(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
-        has_move_events = behavior_result.get("stats", {}).get("has_move_events", False)
+        n_events = behavior_result.get("stats", {}).get("n_events", 0)
+        total_distance = behavior_result.get("stats", {}).get("total_distance", 0)
+        oob_rate_canvas = behavior_result.get("stats", {}).get("oob_rate_canvas", 0.0)
 
-        if not has_move_events:
+        # Pattern 3: 긁지 않고 바로 정답 선택 (oob 비율 100%)
+        # Pattern 1: scratch 위를 move하고 바로 정답클릭 (oob비율 100%안나옴)
+        if oob_rate_canvas >= 0.99 or (oob_rate_canvas < 0.99 and total_distance < 20 and n_events < 10):
             logger.info(
-                f"[디버그] 스크래치 없이 정답 클릭 감지. clientToken: {session.clientToken}, has_move_events: {has_move_events}")
+                f"[디버그] 스크래치 없이 정답 클릭 감지. clientToken: {session.clientToken}, n_events: {n_events}, total_distance: {total_distance}, oob_rate_canvas: {oob_rate_canvas}")
             result = CaptchaResult.FAIL
             message = "스크래치 없이 정답을 클릭했습니다."
             self.captchaRepo.createCaptchaLog(
