@@ -94,7 +94,7 @@ class RuleCheckService:
 
     def check_mean_speed(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
         mean_speed = behavior_result.get("stats", {}).get("speed_mean")
-        
+
         # Check for no movement at all
         if mean_speed is not None and mean_speed == 0 and behavior_result.get("stats", {}).get("n_events", 0) > 1:
             logger.info(
@@ -113,7 +113,7 @@ class RuleCheckService:
                 session.keyId, result.value, int(latency.total_seconds() * 1000))
             self.db.commit()
             return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
-        
+
         # Check for extremely high average speed (e.g., > 3000 pixels/sec)
         if mean_speed is not None and mean_speed > 3000:
             logger.info(
@@ -312,8 +312,6 @@ class CaptchaService:
             if time_check_result:
                 return time_check_result
 
-            
-
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
                     session=session,
@@ -394,9 +392,12 @@ class CaptchaService:
                 # 성공한 경우에만 행동 데이터를 업로드합니다.
                 if settings.ENABLE_KS3:
                     uploadBehaviorDataTask.delay(clientToken)
-            elif is_correct and verdict != "human":
+            elif verdict != "human":
                 result = CaptchaResult.FAIL
-                message = "행동검증에 실패했습니다."
+                message = "수상한 움직임이 감지되었습니다."
+            elif not is_correct:
+                result = CaptchaResult.FAIL
+                message = "캡챠 문제를 틀렸습니다."
             else:
                 result = CaptchaResult.FAIL
                 message = "캡챠 검증에 실패했습니다."
