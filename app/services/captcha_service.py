@@ -73,7 +73,7 @@ class RuleCheckService:
 
     def check_event_count(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
         n_events = behavior_result.get("stats", {}).get("n_events")
-        if n_events is not None and n_events < 5:
+        if n_events is not None and n_events < 20:
             logger.info(
                 f"[디버그] 이벤트 수가 너무 적음. clientToken: {session.clientToken}, n_events: {n_events}")
             result = CaptchaResult.FAIL
