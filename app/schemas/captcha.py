@@ -26,11 +26,7 @@ class CaptchaProblemResponse(BaseModel):
         description="사용자가 선택할 수 있는 옵션 목록",
         example=["고양이", "강아지", "새", "물고기"]
     )
-    correctAnswer: Optional[str] = Field(
-        None,
-        description="테스트 환경에서만 제공되는 캡챠 정답. 운영 환경에서는 항상 None입니다.",
-        example="고양이"
-    )
+    
 
     class Config:
         from_attributes = True

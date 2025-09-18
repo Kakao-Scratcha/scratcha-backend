@@ -127,9 +127,7 @@ class CaptchaService:
                 clientToken=session.clientToken,
                 imageUrl=fullImageUrl,
                 prompt=selectedProblem.prompt,
-                options=option_list,
-                # 테스트 환경에서만 정답을 포함합니다.
-                correctAnswer=selectedProblem.answer if settings.ENV == "test" else None
+                options=option_list
             )
             # logger.info(f"[디버그] 생성된 문제 : {response_data}")
             return response_data
