@@ -236,17 +236,6 @@ class CaptchaService:
                     confidence = behavior_result.get("bot_prob")
                     verdict = behavior_result.get("verdict")
 
-            # 룰체크는 항상 진행
-            no_scratching_check_result = rule_checker.check_no_scratching(
-                session, latency, behavior_result, confidence, request.scratchedPercentage, request.scratchedTime)
-            if no_scratching_check_result:
-                return no_scratching_check_result
-
-            no_mouse_movement_check_result = rule_checker.check_no_mouse_movement(
-                session, latency, behavior_result, confidence)
-            if no_mouse_movement_check_result:
-                return no_mouse_movement_check_result
-
             # 디바이스 타입 체크 (ML 모델 결과 무시 여부 결정)
             device_type_check_result = rule_checker.check_device_type(
                 session_meta)
@@ -277,9 +266,6 @@ class CaptchaService:
                 # 성공한 경우에만 행동 데이터를 업로드합니다.
                 if settings.ENABLE_KS3:
                     uploadBehaviorDataTask.delay(clientToken)
-            elif verdict != "human":
-                result = CaptchaResult.FAIL
-                message = "수상한 움직임이 감지되었습니다."
             elif not is_correct:
                 result = CaptchaResult.FAIL
                 message = "캡챠 문제를 틀렸습니다."

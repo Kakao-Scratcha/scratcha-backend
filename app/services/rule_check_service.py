@@ -33,7 +33,7 @@ class RuleCheckService:
                 detail="스크래치 시간이 너무 짧습니다. 최소 0.5초(500ms) 이상이어야 합니다."
             )
         # scratch_percent는 정수 퍼센트 단위로 가정 (1%)
-        if scratch_percent < 1:
+        if scratch_percent < 2:
             logger.info(f"CAPTCHA 규칙 위반: 스크래치 퍼센트 너무 낮음 ({scratch_percent}%)")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -53,4 +53,5 @@ class RuleCheckService:
 
     def check_captcha_timeout(self, created_at: datetime, timeout_seconds: int):
         if (datetime.now(timezone.utc) - created_at).total_seconds() > timeout_seconds:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Captcha session timed out")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Captcha session timed out")
