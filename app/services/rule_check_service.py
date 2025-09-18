@@ -22,7 +22,7 @@ class RuleCheckService:
         self.usageStatsRepo = usage_stats_repo
 
     def check_time_constraint(self, session: CaptchaSession, latency: timedelta) -> Optional[CaptchaVerificationResponse]:
-        if latency < timedelta(seconds=1.5):
+        if latency < timedelta(seconds=0.5):
             logger.info(
                 f"[디버그] 너무 빠른 캡챠 시도 감지. clientToken: {session.clientToken}, latency: {latency}")
             self.captchaRepo.createCaptchaLog(
@@ -41,8 +41,10 @@ class RuleCheckService:
 
     def check_no_scratching(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
         n_events = behavior_result.get("stats", {}).get("n_events", 0)
-        total_distance = behavior_result.get("stats", {}).get("total_distance", 0)
-        oob_rate_canvas = behavior_result.get("stats", {}).get("oob_rate_canvas", 0.0)
+        total_distance = behavior_result.get(
+            "stats", {}).get("total_distance", 0)
+        oob_rate_canvas = behavior_result.get(
+            "stats", {}).get("oob_rate_canvas", 0.0)
 
         # Pattern 3: 긁지 않고 바로 정답 선택 (oob 비율 100%)
         # Pattern 1: scratch 위를 move하고 바로 정답클릭 (oob비율 100%안나옴)
