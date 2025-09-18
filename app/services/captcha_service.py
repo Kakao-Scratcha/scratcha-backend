@@ -196,16 +196,17 @@ class CaptchaService:
 
             latency = datetime.now(settings.TIMEZONE) - session.createdAt
 
-            # Instantiate RuleCheckService
+            # 룰 체크 인스턴스 생성
             rule_checker = RuleCheckService(
                 self.db, self.captchaRepo, UsageStatsRepository(self.db))
 
-            # Apply scratch rules check first
+            # 룰 체크 서비스 사용
             scratch_rule_error = rule_checker.check_captcha_scratch_rules(
                 request.scratchedPercentage, request.scratchedTime)
             if scratch_rule_error:
                 logger.info(f"CAPTCHA 규칙 위반으로 봇으로 판단: {scratch_rule_error}")
                 verdict = "bot"  # Set verdict to bot if rule check fails
+                return CaptchaVerificationResponse(result="fail", message=scratch_rule_error, confidence=None, verdict=verdict)
 
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
@@ -234,7 +235,7 @@ class CaptchaService:
                 logger.info(f"[디버그] 행동 분석 결과: {behavior_result}")  # 디버깅용
                 if behavior_result and behavior_result.get("ok"):
                     confidence = behavior_result.get("bot_prob")
-                    if verdict is None: # Only update verdict if not already set by rule checker
+                    if verdict is None:  # Only update verdict if not already set by rule checker
                         verdict = behavior_result.get("verdict")
             # 디버깅용
             logger.info(
@@ -258,12 +259,6 @@ class CaptchaService:
                 # 성공한 경우에만 행동 데이터를 업로드합니다.
                 if settings.ENABLE_KS3:
                     uploadBehaviorDataTask.delay(clientToken)
-            elif is_correct and verdict == "bot":
-                result = CaptchaResult.FAIL
-                message = "봇으로 감지되어 캡챠 검증에 실패했습니다."
-            elif not is_correct:
-                result = CaptchaResult.FAIL
-                message = "틀린 답변으로 캡챠 검증에 실패했습니다."
             else:
                 result = CaptchaResult.FAIL
                 message = "캡챠 검증에 실패했습니다."
