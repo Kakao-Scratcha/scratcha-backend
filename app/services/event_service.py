@@ -4,7 +4,8 @@ import logging
 from app.schemas.event import EventChunk
 from app.core.ks3 import upload_behavior_chunk
 from typing import Dict, Any
-from fastapi import HTTPException, status # Import HTTPException and status
+from fastapi import HTTPException, status
+from fastapi.concurrency import run_in_threadpool # Added import
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ class EventService:
     def __init__(self):
         pass
 
-    def process_event_chunk(self, chunk: EventChunk) -> Dict[str, Any]:
+    async def process_event_chunk(self, chunk: EventChunk) -> Dict[str, Any]:
         """
         수신된 이벤트 청크를 처리하고 KS3에 업로드합니다.
 
@@ -27,7 +28,7 @@ class EventService:
 
         try:
             # KS3에 청크 업로드
-            upload_behavior_chunk(chunk)
+            await run_in_threadpool(upload_behavior_chunk, chunk) # Wrapped with run_in_threadpool
             logger.info(f"세션 {chunk.client_token}의 청크 {chunk.chunk_index} KS3 업로드 성공.")
         except Exception as e:
             logger.error(f"세션 {chunk.client_token}의 청크 {chunk.chunk_index} KS3 업로드 중 오류 발생: {e}", exc_info=True)

@@ -163,7 +163,7 @@ class CaptchaService:
             CaptchaVerificationResponse: 캡챠 검증 결과 (성공, 실패, 시간 초과).
         """
         # 순환 참조를 방지하기 위해 함수 내에서 task를 임포트합니다.
-        from app.tasks.captcha_tasks import uploadBehaviorDataTask
+        from app.tasks.captcha_tasks import uploadBehaviorDataTask, processBehaviorVerificationTask
 
         try:
             confidence = None  # Initialize confidence
@@ -232,15 +232,12 @@ class CaptchaService:
                 confidence = device_type_check_result.confidence
                 skip_behavior_verification = True
 
-            behavior_result = None
             if not skip_behavior_verification and session_meta and full_events_from_chunks:
-                behavior_result = behavior_service.run_behavior_verification(
-                    session_meta, full_events_from_chunks)
-                # logger.info(f"[디버그] 행동 분석 결과: {behavior_result}")
-                if behavior_result and behavior_result.get("ok"):
-                    confidence = behavior_result.get("bot_prob")
-                    if verdict is None:  # Only update verdict if not already set by rule checker
-                        verdict = behavior_result.get("verdict")
+                # 비동기적으로 행동 검증 모델 실행
+                processBehaviorVerificationTask.delay(clientToken, session_meta, full_events_from_chunks)
+                logger.info(f"[행동 검증 모델] 비동기 작업 시작: clientToken={clientToken}")
+            else:
+                logger.info(f"[행동 검증 모델] 실행 건너뜀: clientToken={clientToken}, skip_behavior_verification={skip_behavior_verification}, session_meta_exists={bool(session_meta)}, full_events_from_chunks_exists={bool(full_events_from_chunks)}")
             logger.info(f"[행동 검증 모델] 신뢰도: {confidence}, 판정: {verdict}")
 
             # 7. 세션에 연결된 캡챠 문제의 정답을 가져옵니다.

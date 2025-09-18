@@ -106,6 +106,52 @@ def uploadBehaviorDataTask(clientToken: str):
             f"클라이언트 토큰 {clientToken}에 대한 행동 데이터 업로드 오류: {e}")
 
 
+@celery_app.task(bind=True)
+def processBehaviorVerificationTask(self, clientToken: str, session_meta: Dict[str, Any], full_events_from_chunks: List[Dict[str, Any]]):
+    """
+    행동 데이터를 기반으로 봇 여부를 비동기적으로 검증하고 CaptchaLog를 업데이트하는 Celery 작업입니다.
+    """
+    from app.services import behavior_service
+    from app.repositories.captcha_repo import CaptchaRepository
+    from db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        captcha_repo = CaptchaRepository(db)
+        session = captcha_repo.getCaptchaSessionByClientToken(clientToken)
+        if not session:
+            logger.warning(f"processBehaviorVerificationTask: CaptchaSession not found for clientToken {clientToken}")
+            return
+
+        behavior_result = behavior_service.run_behavior_verification(
+            session_meta, full_events_from_chunks)
+        logger.info(f"[비동기 행동 분석] clientToken: {clientToken}, 결과: {behavior_result}")
+
+        ml_confidence = None
+        ml_is_bot = None
+        if behavior_result and behavior_result.get("ok"):
+            ml_confidence = behavior_result.get("bot_prob")
+            verdict_from_ml = behavior_result.get("verdict")
+            ml_is_bot = True if verdict_from_ml == "bot" else False
+
+        # CaptchaLog 업데이트
+        captcha_log = captcha_repo.getCaptchaLogBySessionId(session.id)
+        if captcha_log:
+            captcha_log.ml_confidence = ml_confidence
+            captcha_log.ml_is_bot = ml_is_bot
+            db.add(captcha_log)
+            db.commit()
+            logger.info(f"clientToken {clientToken}에 대한 CaptchaLog ML 결과 업데이트 성공.")
+        else:
+            logger.warning(f"clientToken {clientToken}에 대한 CaptchaLog를 찾을 수 없어 ML 결과 업데이트 실패.")
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"clientToken {clientToken}에 대한 행동 검증 작업 중 오류 발생: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
 @celery_app.task
 def cleanupExpiredSessionsTask():
     """
