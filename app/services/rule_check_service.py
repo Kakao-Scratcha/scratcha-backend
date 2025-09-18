@@ -86,3 +86,11 @@ class RuleCheckService:
             self.db.commit()
             return CaptchaVerificationResponse(result=result.value, message=message, confidence=confidence, verdict="bot")
         return None
+
+    def check_device_type(self, session_meta: Dict[str, Any]) -> Optional[CaptchaVerificationResponse]:
+        if session_meta and session_meta.get("device") == "touch":
+            logger.info(f"[디버그] 터치 디바이스 감지. ML 모델 결과 무시하고 human으로 간주합니다.")
+            # For touch devices, we consider it human if it passes other rule checks
+            # The verdict and confidence will be set later in captcha_service.py
+            return CaptchaVerificationResponse(result="success", message="터치 디바이스로 확인되었습니다.", confidence=0.5, verdict="human")
+        return None

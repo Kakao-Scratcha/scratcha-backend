@@ -232,8 +232,7 @@ class CaptchaService:
             logger.info(
                 f"[디버그] KS3에서 다운로드된 전체 이벤트 수: {len(full_events_from_chunks)}")
 
-            # request.meta는 verify 요청에 포함된 메타데이터를 사용합니다.
-            # 행동 분석은 KS3에서 가져온 전체 이벤트 데이터를 사용합니다.
+            behavior_result = None
             if session_meta and full_events_from_chunks:
                 behavior_result = behavior_service.run_behavior_verification(
                     session_meta, full_events_from_chunks)
@@ -242,19 +241,27 @@ class CaptchaService:
                     confidence = behavior_result.get("bot_prob")
                     verdict = behavior_result.get("verdict")
 
-                    no_scratching_check_result = rule_checker.check_no_scratching(
-                        session, latency, behavior_result, confidence)
-                    if no_scratching_check_result:
-                        return no_scratching_check_result
+            # 룰체크는 항상 진행
+            no_scratching_check_result = rule_checker.check_no_scratching(
+                session, latency, behavior_result, confidence)
+            if no_scratching_check_result:
+                return no_scratching_check_result
 
-                    no_mouse_movement_check_result = rule_checker.check_no_mouse_movement(
-                        session, latency, behavior_result, confidence)
-                    if no_mouse_movement_check_result:
-                        return no_mouse_movement_check_result
+            no_mouse_movement_check_result = rule_checker.check_no_mouse_movement(
+                session, latency, behavior_result, confidence)
+            if no_mouse_movement_check_result:
+                return no_mouse_movement_check_result
 
-                    # 디버깅용
-                    logger.info(
-                        f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}")
+            # 디바이스 타입 체크 (ML 모델 결과 무시 여부 결정)
+            device_type_check_result = rule_checker.check_device_type(session_meta)
+            if device_type_check_result:
+                # ML 모델 결과 무시하고 human으로 간주
+                verdict = device_type_check_result.verdict
+                confidence = device_type_check_result.confidence
+
+            # 디버깅용
+            logger.info(
+                f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}")
 
             # 7. 세션에 연결된 캡챠 문제의 정답을 가져옵니다.
             correct_answer = session.captchaProblem.answer
