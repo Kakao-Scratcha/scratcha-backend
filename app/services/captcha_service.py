@@ -54,11 +54,8 @@ class CaptchaService:
         Returns:
             CaptchaProblemResponse: 생성된 캡챠 문제의 상세 정보 (클라이언트 토큰, 이미지 URL, 프롬프트, 선택지).
         """
-        logger.info(
-            f"[디버그] 문제생성 호출")  # 디버깅용
-        # 디버깅용
-        logger.info(
-            f"[디버그] API Key ID: {apiKey.id}, Difficulty: {apiKey.difficulty}")
+        logger.info(f"[캡챠 생성] 호출")
+        # logger.info(f"[디버그] API Key ID: {apiKey.id}, Difficulty: {apiKey.difficulty}")
         try:
             # 1. API 키에 연결된 사용자(User) 객체를 조회하고, 비관적 잠금(with_for_update)을 적용하여 동시성 문제를 방지합니다.
             user: User = self.db.query(User).filter(
@@ -134,9 +131,7 @@ class CaptchaService:
                 # 테스트 환경에서만 정답을 포함합니다.
                 correctAnswer=selectedProblem.answer if settings.ENV == "test" else None
             )
-            # 디버깅용
-            logger.info(
-                f"[디버그] 생성된 문제 : {response_data}")
+            # logger.info(f"[디버그] 생성된 문제 : {response_data}")
             return response_data
 
         except HTTPException as e:
@@ -156,7 +151,7 @@ class CaptchaService:
         userAgent: Optional[str]
     ) -> CaptchaVerificationResponse:
         logger.info(
-            f"[디버그] 캡챠검증 호출됨. clientToken: {clientToken}, request: {request.dict()}, ipAddress: {ipAddress}, userAgent: {userAgent}")
+            f"[캡챠 검증] clientToken: {clientToken}, 선택한 정답: {request.answer}, 스크래치 비율: {request.scratchedPercentage}, 스크래치 시간: {request.scratchedTime}ms")
         """
         제출된 캡챠 답변을 검증하고, 결과를 기록하는 비즈니스 로직입니다.
 
@@ -204,10 +199,11 @@ class CaptchaService:
             scratch_rule_error = rule_checker.check_captcha_scratch_rules(
                 request.scratchedPercentage, request.scratchedTime)
             if scratch_rule_error:
-                logger.info(f"CAPTCHA 규칙 위반으로 봇으로 판단: {scratch_rule_error}")
+                logger.info(f"{scratch_rule_error}")
                 verdict = "bot"  # Set verdict to bot if rule check fails
                 return CaptchaVerificationResponse(result="fail", message=scratch_rule_error, confidence=None, verdict=verdict)
 
+            # 세션 만료 (3분 초과 시 타임아웃 처리)
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
                     session=session,
@@ -222,46 +218,55 @@ class CaptchaService:
                     session.keyId, CaptchaResult.TIMEOUT.value, int(latency.total_seconds() * 1000))
                 self.db.commit()
                 return CaptchaVerificationResponse(result="timeout", message="캡챠 세션이 만료되었습니다.")
+
             # KS3에서 청크 데이터 다운로드 및 병합
             # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
-
             full_events_from_chunks, session_meta = download_behavior_chunks(
                 clientToken)
 
+            skip_behavior_verification = False
+            # 디바이스 타입 체크 (ML 모델 결과 무시 여부 결정)
+            device_type_check_result = rule_checker.check_device_type(
+                session_meta)
+            if device_type_check_result:
+                # ML 모델 결과 무시하고 human으로 간주
+                verdict = device_type_check_result.verdict
+                confidence = device_type_check_result.confidence
+                skip_behavior_verification = True
+
             behavior_result = None
-            if session_meta and full_events_from_chunks:
+            if not skip_behavior_verification and session_meta and full_events_from_chunks:
                 behavior_result = behavior_service.run_behavior_verification(
                     session_meta, full_events_from_chunks)
-                logger.info(f"[디버그] 행동 분석 결과: {behavior_result}")  # 디버깅용
+                # logger.info(f"[디버그] 행동 분석 결과: {behavior_result}")
                 if behavior_result and behavior_result.get("ok"):
                     confidence = behavior_result.get("bot_prob")
                     if verdict is None:  # Only update verdict if not already set by rule checker
                         verdict = behavior_result.get("verdict")
-            # 디버깅용
-            logger.info(
-                f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}")
+            logger.info(f"[행동 검증 모델] 신뢰도: {confidence}, 판정: {verdict}")
 
             # 7. 세션에 연결된 캡챠 문제의 정답을 가져옵니다.
             correct_answer = session.captchaProblem.answer
             # 8. 사용자가 제출한 답변과 정답을 비교하여 성공 여부를 판단합니다.
-            # 디버깅용
-            logger.info(
-                f"[디버그] 비교 중: request.answer='{request.answer}' (type: {type(request.answer)}), correct_answer='{correct_answer}' (type: {type(correct_answer)})")
+            # logger.info(f"[행동 검증] 비교 중: request.answer='{request.answer}' (type: {type(request.answer)}), correct_answer='{correct_answer}' (type: {type(correct_answer)})")
             is_correct = request.answer == correct_answer
 
             # 9. 성공 여부에 따라 결과(SUCCESS/FAIL)와 메시지를 설정합니다.
-            # 디버깅용
+            # logger.info(f"[디버그] 비교 중: is_correct={is_correct}, verdict={verdict}")
             logger.info(
-                f"[디버그] 비교 중: is_correct={is_correct}, verdict={verdict}")
+                f"[캡챠 검증] 최종 비교 = 정답: {is_correct}, 판정: {verdict}, 신뢰도: {confidence}")
             if is_correct and verdict == "human":
                 result = CaptchaResult.SUCCESS
                 message = "캡챠 검증에 성공했습니다."
+                logger.info(f"[캡챠 검증] 성공")
                 # 성공한 경우에만 행동 데이터를 업로드합니다.
                 if settings.ENABLE_KS3:
                     uploadBehaviorDataTask.delay(clientToken)
             else:
                 result = CaptchaResult.FAIL
                 message = "캡챠 검증에 실패했습니다."
+                logger.info(
+                    f"[캡챠 검증] 실패")
 
             # 10. 검증 결과를 로그에 기록합니다.
             ml_is_bot = True if verdict == "bot" else False
