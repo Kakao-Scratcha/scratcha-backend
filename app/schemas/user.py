@@ -105,30 +105,22 @@ class UserUpdate(BaseModel):  # 사용자 업데이트 스키마
     userName: Optional[str] = Field(
         None,
         description="새로운 사용자 이름",
-        example="새로운 홍길동",
-        min_length=1,
-        max_length=30
+        example="새로운 홍길동"
     )
     currnetPassword: Optional[str] = Field(
         None,
         description="현재 비밀번호",
         example="password123!@#",
-        min_length=8,
-        max_length=20
     )
     newPassword: Optional[str] = Field(
         None,
         description="새로운 비밀번호",
         example="newpassword123!@#",
-        min_length=8,
-        max_length=20
     )
     confirmPassword: Optional[str] = Field(
         None,
         description="새로운 비밀번호 확인",
         example="newpassword123!@#",
-        min_length=8,
-        max_length=20
     )
 
     @field_validator('userName')
@@ -150,11 +142,20 @@ class UserUpdate(BaseModel):  # 사용자 업데이트 스키마
 
     @field_validator('newPassword')
     @classmethod
-    def validate_new_password(cls, v):
-        if v is None:
-            return v
-        if not 8 <= len(v) <= 20:
-            raise ValueError("비밀번호는 8~20자 이내로 입력해주세요.")
+    def validate_password(cls, v):
+        if not 8 <= len(v) <= 64:
+            raise ValueError("비밀번호는 8~64자 이내로 입력해주세요.")
+        if v.isdigit():
+            raise ValueError("비밀번호는 숫자만으로 구성할 수 없습니다.")
+        if not re.match(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:,./?]+$', v):
+            raise ValueError("비밀번호에 허용되지 않는 문자(공백 등)가 포함되어 있습니다.")
+        return v
+
+    @field_validator('confirmPassword')
+    @classmethod
+    def validate_password(cls, v):
+        if not 8 <= len(v) <= 64:
+            raise ValueError("비밀번호는 8~64자 이내로 입력해주세요.")
         if v.isdigit():
             raise ValueError("비밀번호는 숫자만으로 구성할 수 없습니다.")
         if not re.match(r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:,./?]+$', v):
