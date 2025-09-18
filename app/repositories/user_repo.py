@@ -1,5 +1,6 @@
 # app/repositories/user_repo.py
 
+import logging
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -7,6 +8,8 @@ from fastapi import HTTPException, status
 
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class UserRepository:
@@ -33,7 +36,9 @@ class UserRepository:
                 query = query.filter(User.deletedAt.is_(None))
 
             # 3. 쿼리를 실행하고 첫 번째 결과를 반환합니다.
-            return query.first()
+            
+            user = query.first()
+            return user
         except Exception as e:
             # 4. 데이터베이스 조회 중 오류 발생 시 서버 오류를 반환합니다.
             raise HTTPException(

@@ -19,6 +19,10 @@ class InvalidPasswordException(Exception):
     """비밀번호가 일치하지 않을 때 발생하는 예외입니다."""
     pass
 
+class UserSoftDeletedException(Exception):
+    """소프트 삭제된 사용자가 로그인 시도할 때 발생하는 예외입니다."""
+    pass
+
 # 인증(Authentication) 관련 비즈니스 로직을 처리하는 서비스 클래스입니다.
 # 사용자 인증, JWT 토큰 생성 등의 기능을 제공합니다.
 class AuthService:
@@ -46,7 +50,7 @@ class AuthService:
         """
         try:
             # 1. 이메일을 사용하여 데이터베이스에서 사용자를 조회합니다.
-            user = self.userRepo.getUserByEmail(email)
+            user = self.userRepo.getUserByEmail(email, includeDeleted=True)
         except Exception as e:
             # 2. 사용자 조회 중 데이터베이스 오류 발생 시 서버 오류를 반환합니다.
             raise HTTPException(
@@ -63,6 +67,10 @@ class AuthService:
             raise InvalidPasswordException()
 
         # 5. 인증에 성공하면 사용자 객체를 반환합니다.
+        # 6. 사용자가 소프트 삭제되었는지 확인합니다.
+        if user.deletedAt is not None:
+            raise UserSoftDeletedException()
+
         return user
 
     def createAccessTokenForUser(self, user: User, expiresDelta: Optional[timedelta] = None) -> Token:

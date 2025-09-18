@@ -10,6 +10,7 @@ from app.services.auth_service import (
     AuthService,
     UserNotFoundException,
     InvalidPasswordException,
+    UserSoftDeletedException,
 )
 
 # API 라우터 객체 생성
@@ -28,7 +29,7 @@ router = APIRouter(
 )
 async def loginForAccessToken(
     formData: UserLogin,
-    db: Session = Depends(get_db), # Direct DB session injection
+    db: Session = Depends(get_db),  # Direct DB session injection
 ):
     """
     사용자 로그인을 처리하고 액세스 토큰을 발급합니다.
@@ -57,6 +58,13 @@ async def loginForAccessToken(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="비밀번호가 올바르지 않습니다.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except UserSoftDeletedException:
+        # 5. 사용자가 소프트 삭제된 경우, 403 Forbidden 오류를 발생시킵니다.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="삭제된 계정입니다. 문의 페이지를 통해 문의해주세요.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
