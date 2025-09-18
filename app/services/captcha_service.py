@@ -198,11 +198,9 @@ class CaptchaService:
             rule_checker = RuleCheckService(
                 self.db, self.captchaRepo, UsageStatsRepository(self.db))
 
-            # Apply time constraint check (existing)
-            time_check_result = rule_checker.check_time_constraint(
-                session, latency)
-            if time_check_result:
-                return time_check_result
+            # Apply scratch rules check first
+            rule_checker.check_captcha_scratch_rules(
+                request.scratchedPercentage, request.scratchedTime)
 
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
@@ -225,10 +223,9 @@ class CaptchaService:
 
             # KS3에서 청크 데이터 다운로드 및 병합
             # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
-            
+
             full_events_from_chunks, session_meta = download_behavior_chunks(
                 clientToken)
-            
 
             behavior_result = None
             if session_meta and full_events_from_chunks:
@@ -251,7 +248,8 @@ class CaptchaService:
                 return no_mouse_movement_check_result
 
             # 디바이스 타입 체크 (ML 모델 결과 무시 여부 결정)
-            device_type_check_result = rule_checker.check_device_type(session_meta)
+            device_type_check_result = rule_checker.check_device_type(
+                session_meta)
             if device_type_check_result:
                 # ML 모델 결과 무시하고 human으로 간주
                 verdict = device_type_check_result.verdict
