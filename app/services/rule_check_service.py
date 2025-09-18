@@ -39,18 +39,11 @@ class RuleCheckService:
             return CaptchaVerificationResponse(result="fail", message="너무 빠르게 캡챠를 시도했습니다.")
         return None
 
-    def check_no_scratching(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float]) -> Optional[CaptchaVerificationResponse]:
-        n_events = behavior_result.get("stats", {}).get("n_events", 0)
-        total_distance = behavior_result.get(
-            "stats", {}).get("total_distance", 0)
-        oob_rate_canvas = behavior_result.get(
-            "stats", {}).get("oob_rate_canvas", 0.0)
-
-        # Pattern 3: 긁지 않고 바로 정답 선택 (oob 비율 100%)
-        # Pattern 1: scratch 위를 move하고 바로 정답클릭 (oob비율 100%안나옴)
-        if oob_rate_canvas == 1:
+    def check_no_scratching(self, session: CaptchaSession, latency: timedelta, behavior_result: Dict[str, Any], confidence: Optional[float], scratchedPercentage: int, scratchedTime: int) -> Optional[CaptchaVerificationResponse]:
+        # New logic incorporating scratchedPercentage and scratchedTime
+        if scratchedPercentage < 1 or scratchedTime < 500:
             logger.info(
-                f"[디버그] 스크래치 없이 정답 클릭 감지. clientToken: {session.clientToken}, n_events: {n_events}, total_distance: {total_distance}, oob_rate_canvas: {oob_rate_canvas}")
+                f"[디버그] 스크래치 없이 정답 클릭 감지. clientToken: {session.clientToken}, scratchedPercentage: {scratchedPercentage}, scratchedTime: {scratchedTime}")
             result = CaptchaResult.FAIL
             message = "스크래치 없이 정답을 클릭했습니다."
             self.captchaRepo.createCaptchaLog(

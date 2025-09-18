@@ -225,12 +225,10 @@ class CaptchaService:
 
             # KS3에서 청크 데이터 다운로드 및 병합
             # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
-            logger.info(
-                f"[디버그] KS3에서 행동 데이터 청크 다운로드 시도. clientToken: {clientToken}")
+            
             full_events_from_chunks, session_meta = download_behavior_chunks(
                 clientToken)
-            logger.info(
-                f"[디버그] KS3에서 다운로드된 전체 이벤트 수: {len(full_events_from_chunks)}")
+            
 
             behavior_result = None
             if session_meta and full_events_from_chunks:
@@ -243,7 +241,7 @@ class CaptchaService:
 
             # 룰체크는 항상 진행
             no_scratching_check_result = rule_checker.check_no_scratching(
-                session, latency, behavior_result, confidence)
+                session, latency, behavior_result, confidence, request.scratchedPercentage, request.scratchedTime)
             if no_scratching_check_result:
                 return no_scratching_check_result
 

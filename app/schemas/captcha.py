@@ -43,6 +43,16 @@ class CaptchaVerificationRequest(BaseModel):
         description="사용자가 선택한 정답",
         example="고양이"
     )
+    scratchedPercentage: int = Field(
+        ...,
+        description="사용자가 스크래치한 영역의 비율 (0 ~ 100)",
+        example=75
+    )
+    scratchedTime: int = Field(
+        ...,
+        description="사용자가 스크래치한 시간 (밀리초)",
+        example=1234
+    )
 
 
 class CaptchaVerificationResponse(BaseModel):
