@@ -48,7 +48,7 @@ class RuleCheckService:
 
         # Pattern 3: 긁지 않고 바로 정답 선택 (oob 비율 100%)
         # Pattern 1: scratch 위를 move하고 바로 정답클릭 (oob비율 100%안나옴)
-        if oob_rate_canvas >= 0.5:
+        if oob_rate_canvas == 1:
             logger.info(
                 f"[디버그] 스크래치 없이 정답 클릭 감지. clientToken: {session.clientToken}, n_events: {n_events}, total_distance: {total_distance}, oob_rate_canvas: {oob_rate_canvas}")
             result = CaptchaResult.FAIL
