@@ -173,6 +173,8 @@ class CaptchaService:
         from app.tasks.captcha_tasks import uploadBehaviorDataTask
 
         try:
+            confidence = None  # Initialize confidence
+            verdict = None  # Initialize verdict
             # 1. 클라이언트 토큰을 사용하여 캡챠 세션 정보를 데이터베이스에서 조회합니다.
             session = self.captchaRepo.getCaptchaSessionByClientToken(
                 clientToken, for_update=True)
@@ -199,8 +201,11 @@ class CaptchaService:
                 self.db, self.captchaRepo, UsageStatsRepository(self.db))
 
             # Apply scratch rules check first
-            rule_checker.check_captcha_scratch_rules(
+            scratch_rule_error = rule_checker.check_captcha_scratch_rules(
                 request.scratchedPercentage, request.scratchedTime)
+            if scratch_rule_error:
+                logger.info(f"CAPTCHA 규칙 위반으로 봇으로 판단: {scratch_rule_error}")
+                verdict = "bot"  # Set verdict to bot if rule check fails
 
             if latency > timedelta(minutes=settings.CAPTCHA_TIMEOUT_MINUTES):
                 self.captchaRepo.createCaptchaLog(
@@ -216,11 +221,6 @@ class CaptchaService:
                     session.keyId, CaptchaResult.TIMEOUT.value, int(latency.total_seconds() * 1000))
                 self.db.commit()
                 return CaptchaVerificationResponse(result="timeout", message="캡챠 세션이 만료되었습니다.")
-
-            # 행동 데이터 분석
-            confidence = None
-            verdict = None
-
             # KS3에서 청크 데이터 다운로드 및 병합
             # 경고: 이 작업은 네트워크 호출을 포함하며, verify 엔드포인트의 응답 시간을 증가시킬 수 있습니다.
 
@@ -234,16 +234,8 @@ class CaptchaService:
                 logger.info(f"[디버그] 행동 분석 결과: {behavior_result}")  # 디버깅용
                 if behavior_result and behavior_result.get("ok"):
                     confidence = behavior_result.get("bot_prob")
-                    verdict = behavior_result.get("verdict")
-
-            # 디바이스 타입 체크 (ML 모델 결과 무시 여부 결정)
-            device_type_check_result = rule_checker.check_device_type(
-                session_meta)
-            if device_type_check_result:
-                # ML 모델 결과 무시하고 human으로 간주
-                verdict = device_type_check_result.verdict
-                confidence = device_type_check_result.confidence
-
+                    if verdict is None: # Only update verdict if not already set by rule checker
+                        verdict = behavior_result.get("verdict")
             # 디버깅용
             logger.info(
                 f"[디버그] 할당된 신뢰도: {confidence}, 판정: {verdict}")
@@ -266,9 +258,12 @@ class CaptchaService:
                 # 성공한 경우에만 행동 데이터를 업로드합니다.
                 if settings.ENABLE_KS3:
                     uploadBehaviorDataTask.delay(clientToken)
+            elif is_correct and verdict == "bot":
+                result = CaptchaResult.FAIL
+                message = "봇으로 감지되어 캡챠 검증에 실패했습니다."
             elif not is_correct:
                 result = CaptchaResult.FAIL
-                message = "캡챠 문제를 틀렸습니다."
+                message = "틀린 답변으로 캡챠 검증에 실패했습니다."
             else:
                 result = CaptchaResult.FAIL
                 message = "캡챠 검증에 실패했습니다."

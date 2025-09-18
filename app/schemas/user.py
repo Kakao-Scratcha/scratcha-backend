@@ -142,7 +142,7 @@ class UserUpdate(BaseModel):  # 사용자 업데이트 스키마
 
     @field_validator('newPassword')
     @classmethod
-    def validate_password(cls, v):
+    def validate_new_password(cls, v):
         if not 8 <= len(v) <= 64:
             raise ValueError("비밀번호는 8~64자 이내로 입력해주세요.")
         if v.isdigit():
@@ -153,7 +153,7 @@ class UserUpdate(BaseModel):  # 사용자 업데이트 스키마
 
     @field_validator('confirmPassword')
     @classmethod
-    def validate_password(cls, v):
+    def validate_confirm_password(cls, v):
         if not 8 <= len(v) <= 64:
             raise ValueError("비밀번호는 8~64자 이내로 입력해주세요.")
         if v.isdigit():
