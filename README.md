@@ -3,8 +3,23 @@
 - 역할
     - 시스템 아키텍처와 ERD 설계, AI 모델의 API 서빙
 - 사용 기술
-    - FastAPI, Uvicorn, Pydantic, SQLAlchemy, Alembic, MySQL, Kakao Cloud VM, GPU, Object Storage, Kubernetes
- 
+    - 언어
+      - Python
+    - 프레임워크
+        - FastAPI
+    - 라이브러리
+        - Pydantic, SQLAlchemy, Alembic
+    - 데이터베이스
+        - MySQL
+    - 데브옵스
+        - Kakao Cloud VM, GPU, Object Storage, Container Registry
+        - Kubernetes
+        - Git Actions
+
+### 시스템 아키텍처
+---
+![백엔드_아키텍처-시스템아키텍처](https://github.com/user-attachments/assets/2223177e-4f17-48e1-8de0-8ee823c55179)
+
   
 ### 배치 서버로 캡챠 문제 생성 일괄 처리
 ---
