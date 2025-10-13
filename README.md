@@ -1,4 +1,4 @@
-# scratCHA
+# scratCHA - Backend
 ## 유저의 스크래치 행동 기반 AI 캡챠 SaaS 플랫폼
 - 역할
     - 시스템 아키텍처와 ERD 설계, AI 모델의 API 서빙
