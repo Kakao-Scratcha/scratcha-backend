@@ -12,9 +12,7 @@
     - 데이터베이스
         - MySQL
     - 데브옵스
-        - Kakao Cloud VM, GPU, Object Storage, Container Registry
-        - Kubernetes
-        - Git Actions
+        - Kakao Cloud, Kubernetes, Git Actions
 
 ## 시스템 아키텍처
 ![백엔드_아키텍처-시스템아키텍처](https://github.com/user-attachments/assets/2223177e-4f17-48e1-8de0-8ee823c55179)
